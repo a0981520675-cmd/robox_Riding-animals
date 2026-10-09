@@ -8,9 +8,9 @@ local VirtualInputManager = game:GetService("VirtualInputManager")
 
 local targets = {
     ["Blackhole Egg"] = true,
-    ["Solaris Egg"] = true,
-    ["Cherub Egg"] = true,
-    ["Volcanic Egg"] = true
+    ["Solaris Egg"]   = true,
+    ["Cherub Egg"]    = true,
+    ["Volcanic Egg"]  = true
 }
 
 local player = Players.LocalPlayer
@@ -21,37 +21,49 @@ local taskPriority = 0
 local blacklist = {}
 local activeConnections = {}
 
+-- 🏠 自動動態基地座標
 local dynamicBaseCFrame = nil
-local POS_A = CFrame.new(-4888.9, 41278.3, -3735.4)
-local POS_B = CFrame.new(-4972.4, 41285.8, -3645.5)
+
+-- 📍 Volcanic Egg 專用 A、B 中轉座標
+local POS_A = CFrame.new(-4888.9, 41278.3, -3735.4) -- 地點 A
+local POS_B = CFrame.new(-4972.4, 41285.8, -3645.5) -- 地點 B
+
+-- 指定瞬移座標
 local customTargetPos = Vector3.new(-5072, 41405, -3447)
+
+-- ===== 遊戲預設出生點 (世界原點 / 中心點) =====
 local DEFAULT_SPAWN_POS = Vector3.new(0, 50, 0)
 
 local function getGameSpawnCFrame()
     local spawnObj = Workspace:FindFirstChildOfClass("SpawnLocation") 
         or Workspace:FindFirstChild("SpawnLocation", true)
         or Workspace:FindFirstChild("Spawn", true)
+    
     if spawnObj and spawnObj:IsA("BasePart") then
         return spawnObj.CFrame + Vector3.new(0, 4, 0)
     end
     return CFrame.new(DEFAULT_SPAWN_POS)
 end
 
-local BLACKLIST_TIME = 15
-local TP_OFFSET = Vector3.new(0, 4, 0)
-local STEP_DIST = 150
-local SYNC_WAIT = 0.1
-local HOLD_TIMEOUT = 2
-local RETRY_INTERVAL = 0.15
-local PICKUP_WAIT = 0.2
-local RETURN_SPEED = 300
-local HOME_HOLD = 1.0
-local LOOP_DELAY = 0.1
+-- ===== 參數設定 =====
+local BLACKLIST_TIME = 15                 -- 失敗的蛋暫時跳過幾秒
+local TP_OFFSET = Vector3.new(0, 4, 0)     -- 高度偏移
+local STEP_DIST = 150                      -- 分段移動每段距離
+local SYNC_WAIT = 0.1                      -- 移動後等待伺服器同步
+local HOLD_TIMEOUT = 2                     -- 最多停留幾秒等蛋被拿走
+local RETRY_INTERVAL = 0.15                -- 快速連點 Prompt 的間隔
+local PICKUP_WAIT = 0.2                    -- 拿到蛋後準備出發
+local RETURN_SPEED = 300                   -- 🚀 提升回基地移動速度
+local HOME_HOLD = 1.0                      -- 到基地後停留並點擊「放下」按鈕的秒數
+local LOOP_DELAY = 0.1                     -- 每輪間隔
+-- ======================================
 
+-- 清理舊 UI
 local parentGui = player:FindFirstChild("PlayerGui") or CoreGui
 local old = parentGui:FindFirstChild("AutoEggPathGui")
 if old then old:Destroy() end
 
+-- ===== UI 建立 (調整高度以容納新按鈕) =====
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "AutoEggPathGui"
 ScreenGui.ResetOnSpawn = false
@@ -89,6 +101,7 @@ TitleLabel.Font = Enum.Font.GothamBold
 TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
 TitleLabel.Parent = TopBar
 
+-- ⚙ 設定基地按鈕
 local SetHomeBtn = Instance.new("TextButton")
 SetHomeBtn.Name = "SetHomeBtn"
 SetHomeBtn.Size = UDim2.new(0, 24, 0, 24)
@@ -156,6 +169,7 @@ local PauseCorner = Instance.new("UICorner")
 PauseCorner.CornerRadius = UDim.new(0, 6)
 PauseCorner.Parent = PauseBtn
 
+-- 🏠 慢速飄回基地按鈕
 local ReturnBtn = Instance.new("TextButton")
 ReturnBtn.Name = "ReturnBtn"
 ReturnBtn.Size = UDim2.new(1, -20, 0, 36)
@@ -171,6 +185,7 @@ local ReturnCorner = Instance.new("UICorner")
 ReturnCorner.CornerRadius = UDim.new(0, 6)
 ReturnCorner.Parent = ReturnBtn
 
+-- 🌀 快速傳送到世界原點按鈕
 local TpSpawnBtn = Instance.new("TextButton")
 TpSpawnBtn.Name = "TpSpawnBtn"
 TpSpawnBtn.Size = UDim2.new(1, -20, 0, 36)
@@ -186,6 +201,7 @@ local TpSpawnCorner = Instance.new("UICorner")
 TpSpawnCorner.CornerRadius = UDim.new(0, 6)
 TpSpawnCorner.Parent = TpSpawnBtn
 
+-- 🎯 回到世界中心點按鈕
 local CenterBtn = Instance.new("TextButton")
 CenterBtn.Name = "CenterBtn"
 CenterBtn.Size = UDim2.new(1, -20, 0, 36)
@@ -201,6 +217,7 @@ local CenterCorner = Instance.new("UICorner")
 CenterCorner.CornerRadius = UDim.new(0, 6)
 CenterCorner.Parent = CenterBtn
 
+-- 📍 傳送到 A 點按鈕
 local TpABtn = Instance.new("TextButton")
 TpABtn.Name = "TpABtn"
 TpABtn.Size = UDim2.new(1, -20, 0, 36)
@@ -216,6 +233,7 @@ local TpACorner = Instance.new("UICorner")
 TpACorner.CornerRadius = UDim.new(0, 6)
 TpACorner.Parent = TpABtn
 
+-- 📍 傳送到 B 點按鈕
 local TpBBtn = Instance.new("TextButton")
 TpBBtn.Name = "TpBBtn"
 TpBBtn.Size = UDim2.new(1, -20, 0, 36)
@@ -231,6 +249,7 @@ local TpBCorner = Instance.new("UICorner")
 TpBCorner.CornerRadius = UDim.new(0, 6)
 TpBCorner.Parent = TpBBtn
 
+-- ⚡ 瞬移至指定座標按鈕
 local TpCustomBtn = Instance.new("TextButton")
 TpCustomBtn.Name = "TpCustomBtn"
 TpCustomBtn.Size = UDim2.new(1, -20, 0, 36)
@@ -246,6 +265,7 @@ local TpCustomCorner = Instance.new("UICorner")
 TpCustomCorner.CornerRadius = UDim.new(0, 6)
 TpCustomCorner.Parent = TpCustomBtn
 
+-- ===== 拖動 UI 邏輯 =====
 local dragging = false
 local dragInput, dragStart, startPos
 
@@ -254,6 +274,7 @@ TopBar.InputBegan:Connect(function(input)
         dragging = true
         dragStart = input.Position
         startPos = MainFrame.Position
+
         input.Changed:Connect(function()
             if input.UserInputState == Enum.UserInputState.End then
                 dragging = false
@@ -278,17 +299,24 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
+-- ===== 核心功能邏輯 =====
+
 local function resetBtnStyles()
     ReturnBtn.Text = "🏠 飄回基地"
     ReturnBtn.BackgroundColor3 = Color3.fromRGB(45, 110, 200)
+
     TpSpawnBtn.Text = "🌀 傳送到世界原點"
     TpSpawnBtn.BackgroundColor3 = Color3.fromRGB(30, 140, 140)
+
     CenterBtn.Text = "🎯 回到世界中心點"
     CenterBtn.BackgroundColor3 = Color3.fromRGB(40, 160, 100)
+
     TpABtn.Text = "📍 傳送到 A 點"
     TpABtn.BackgroundColor3 = Color3.fromRGB(180, 90, 30)
+
     TpBBtn.Text = "📍 傳送到 B 點"
     TpBBtn.BackgroundColor3 = Color3.fromRGB(180, 120, 30)
+
     TpCustomBtn.Text = "⚡ 瞬移至指定座標"
     TpCustomBtn.BackgroundColor3 = Color3.fromRGB(130, 60, 200)
 end
@@ -315,6 +343,7 @@ end
 local function getMoveTarget()
     local char, hum, root = getChar()
     if not char or not root then return end
+
     if hum and hum.SeatPart then
         local seat = hum.SeatPart
         local mountPart = seat.AssemblyRootPart or seat
@@ -327,6 +356,7 @@ end
 local function setNoclip(toggle)
     local targetPart, targetModel = getMoveTarget()
     if not targetModel then return end
+
     for _, v in ipairs(targetModel:GetDescendants()) do
         if v:IsA("BasePart") then
             v.CanCollide = not toggle
@@ -356,10 +386,12 @@ end
 local function setTargetCFrame(targetCF)
     local targetPart, targetModel = getMoveTarget()
     if not targetPart then return end
+
     if targetPart:IsA("BasePart") then
         targetPart.AssemblyLinearVelocity = Vector3.zero
         targetPart.AssemblyAngularVelocity = Vector3.zero
     end
+
     if targetModel and targetModel:IsA("Model") then
         targetModel:PivotTo(targetCF)
     else
@@ -367,53 +399,69 @@ local function setTargetCFrame(targetCF)
     end
 end
 
+-- 🌊 平滑漂移移動函數 (高速 Tween)
 local function driftTo(targetCFrame, duration, myId, myPriority)
     local targetPart, targetModel = getMoveTarget()
     if not targetPart then return false end
+
     setNoclip(true)
     stopMovement()
+
     local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
     local tween = TweenService:Create(targetPart, tweenInfo, {CFrame = targetCFrame})
+    
     tween:Play()
+
     local completed = false
     local conn = tween.Completed:Connect(function()
         completed = true
     end)
+
     while not completed and enabled and runId == myId and (myPriority == nil or taskPriority == myPriority) do
         while isPaused do task.wait(0.05) end
         task.wait(0.01)
     end
+
     conn:Disconnect()
     setNoclip(false)
+
     if not enabled or runId ~= myId or (myPriority and taskPriority ~= myPriority) then
         tween:Cancel()
         return false
     end
+
     setTargetCFrame(targetCFrame)
     return true
 end
 
+-- 高速分段傳送
 local function teleportTo(pos, myId, myPriority, ignoreState)
     local targetPos = pos + TP_OFFSET
     local targetPart = getMoveTarget()
     if not targetPart then return false end
+
     setNoclip(true)
+
     while (ignoreState or (enabled and runId == myId)) and (myPriority == nil or taskPriority == myPriority) do
         while isPaused and (ignoreState or (enabled and runId == myId)) and (myPriority == nil or taskPriority == myPriority) do
             task.wait(0.05)
         end
+
         targetPart = getMoveTarget()
         if not targetPart then
             setNoclip(false)
             return false
         end
+
         local dist = (targetPart.Position - targetPos).Magnitude
         if dist <= STEP_DIST then
             break
         end
+
         local dir = (targetPos - targetPart.Position).Unit
         local nextPos = targetPart.Position + dir * STEP_DIST
         setTargetCFrame(CFrame.new(nextPos))
+        
         if not ignoreState then
             if not smartWait(0.02, myId, myPriority) then 
                 setNoclip(false)
@@ -427,11 +475,13 @@ local function teleportTo(pos, myId, myPriority, ignoreState)
             task.wait(0.02)
         end
     end
+
     if (ignoreState or (enabled and runId == myId)) and (myPriority == nil or taskPriority == myPriority) then
         setTargetCFrame(CFrame.new(targetPos))
         setNoclip(false)
         return true
     end
+
     setNoclip(false)
     return false
 end
@@ -448,10 +498,12 @@ local function interactPrompt(prompt)
     end)
 end
 
+-- 🔍 動態偵測並點擊「放下」按鈕
 local function clickDynamicDropButton()
     pcall(function()
         local playerGui = player:FindFirstChild("PlayerGui")
         if not playerGui then return end
+
         for _, gui in ipairs(playerGui:GetDescendants()) do
             if gui:IsA("TextButton") and (gui.Text == "放下" or string.find(gui.Text, "放")) and gui.Visible then
                 local pos = gui.AbsolutePosition + (gui.AbsoluteSize / 2)
@@ -460,16 +512,20 @@ local function clickDynamicDropButton()
                 VirtualInputManager:SendMouseButtonEvent(pos.X, pos.Y, 0, true, game, 1)
                 task.wait(0.08)
                 VirtualInputManager:SendMouseButtonEvent(pos.X, pos.Y, 0, false, game, 1)
+                print("[AutoDrop] 動態偵測並成功點擊「放下」按鈕！")
             end
         end
     end)
 end
 
+-- 🔍 尋找最近的目標蛋
 local function findNearestEgg(root)
     local folder = Workspace:FindFirstChild("RenderedEggs")
     if not folder then return end
+
     local best, bestDist, bestPos
     local now = os.clock()
+
     for _, egg in ipairs(folder:GetChildren()) do
         if targets[egg.Name] and not (blacklist[egg] and blacklist[egg] > now) then
             local ok, pivot = pcall(function() return egg:GetPivot() end)
@@ -484,10 +540,13 @@ local function findNearestEgg(root)
     return best, bestPos
 end
 
+-- 高速返回基地 (SPEED = 300)
 local function returnToBase(originCFrame, myId, myPriority, isManual)
     local done = false
     local lastTime = os.clock()
+
     setNoclip(true)
+
     local conn
     conn = RunService.Heartbeat:Connect(function()
         if myPriority and taskPriority ~= myPriority then
@@ -495,24 +554,30 @@ local function returnToBase(originCFrame, myId, myPriority, isManual)
             if conn then conn:Disconnect() end
             return
         end
+
         if isPaused then return end
+
         if not isManual and (not enabled or runId ~= myId) then
             done = true
             if conn then conn:Disconnect() end
             return
         end
+
         local targetPart = getMoveTarget()
         if not targetPart then
             done = true
             if conn then conn:Disconnect() end
             return
         end
+
         local now = os.clock()
         local dt = now - lastTime
         lastTime = now
+
         local offset = originCFrame.Position - targetPart.Position
         local dist = offset.Magnitude
         local step = RETURN_SPEED * dt
+
         if dist <= step then
             setTargetCFrame(originCFrame)
             done = true
@@ -520,197 +585,6 @@ local function returnToBase(originCFrame, myId, myPriority, isManual)
             setTargetCFrame(CFrame.new(targetPart.Position + offset.Unit * step))
         end
     end)
+
     if not isManual then
-        table.insert(activeConnections, conn)
-    end
-    while not done do
-        if myPriority and taskPriority ~= myPriority then break end
-        if not isManual and (not enabled or runId ~= myId) then break end
-        task.wait(0.01)
-    end
-    if conn and conn.Connected then
-        conn:Disconnect()
-    end
-    setNoclip(false)
-    if myPriority and taskPriority ~= myPriority then return end
-    if not isManual and (not enabled or runId ~= myId) then return end
-    local t0 = os.clock()
-    while (isManual or (enabled and runId == myId)) and (myPriority == nil or taskPriority == myPriority) and (os.clock() - t0 < HOME_HOLD) do
-        while isPaused do task.wait(0.05) end
-        setTargetCFrame(originCFrame)
-        clickDynamicDropButton()
-        task.wait(0.15)
-    end
-end
-
-local function startLoop()
-    runId = runId + 1
-    local myId = runId
-    local myPriority = taskPriority
-
-    task.spawn(function()
-        local _, _, root0 = getChar()
-        if root0 and not dynamicBaseCFrame then
-            dynamicBaseCFrame = root0.CFrame
-        end
-
-        while enabled and runId == myId and taskPriority == myPriority do
-            while isPaused and enabled and runId == myId and taskPriority == myPriority do
-                task.wait(0.05)
-            end
-
-            local char, hum, root = getChar()
-            if not char then
-                if not smartWait(0.3, myId, myPriority) then break end
-                continue
-            end
-
-            dynamicBaseCFrame = dynamicBaseCFrame or root.CFrame
-            local egg, eggPos = findNearestEgg(root)
-            if not egg then
-                if not smartWait(0.2, myId, myPriority) then break end
-                continue
-            end
-
-            hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
-            hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
-
-            local currentEggName = tostring(egg.Name)
-            local targetEggCF = CFrame.new(eggPos + TP_OFFSET)
-
-            if currentEggName == "Volcanic Egg" then
-                if not driftTo(POS_A, 0.6, myId, myPriority) then break end
-                if not driftTo(POS_B, 0.4, myId, myPriority) then break end
-                if not driftTo(targetEggCF, 0.3, myId, myPriority) then break end
-
-                local lockConn = RunService.Heartbeat:Connect(function()
-                    if enabled and not isPaused and runId == myId and taskPriority == myPriority then
-                        setTargetCFrame(targetEggCF)
-                    end
-                end)
-                table.insert(activeConnections, lockConn)
-                smartWait(SYNC_WAIT, myId, myPriority)
-
-                local t0 = os.clock()
-                while enabled and runId == myId and taskPriority == myPriority and egg.Parent and (os.clock() - t0 < HOLD_TIMEOUT) do
-                    while isPaused do task.wait(0.05) end
-                    for _, v in ipairs(egg:GetDescendants()) do
-                        if v:IsA("ProximityPrompt") and v.Enabled then
-                            interactPrompt(v)
-                        end
-                    end
-                    if not smartWait(RETRY_INTERVAL, myId, myPriority) then break end
-                end
-
-                if lockConn and lockConn.Connected then lockConn:Disconnect() end
-                if not egg.Parent then
-                    smartWait(PICKUP_WAIT, myId, myPriority)
-                else
-                    blacklist[egg] = os.clock() + BLACKLIST_TIME
-                end
-
-                if enabled and runId == myId and taskPriority == myPriority then
-                    driftTo(POS_B, 0.3, myId, myPriority)
-                    driftTo(POS_A, 0.5, myId, myPriority)
-                end
-            else
-                if not teleportTo(eggPos, myId, myPriority, false) then break end
-
-                local lockConn = RunService.Heartbeat:Connect(function()
-                    if enabled and not isPaused and runId == myId and taskPriority == myPriority then
-                        setTargetCFrame(targetEggCF)
-                    end
-                end)
-                table.insert(activeConnections, lockConn)
-                smartWait(SYNC_WAIT, myId, myPriority)
-
-                local t0 = os.clock()
-                while enabled and runId == myId and taskPriority == myPriority and egg.Parent and (os.clock() - t0 < HOLD_TIMEOUT) do
-                    while isPaused do task.wait(0.05) end
-                    for _, v in ipairs(egg:GetDescendants()) do
-                        if v:IsA("ProximityPrompt") and v.Enabled then
-                            interactPrompt(v)
-                        end
-                    end
-                    if not smartWait(RETRY_INTERVAL, myId, myPriority) then break end
-                end
-
-                if lockConn and lockConn.Connected then lockConn:Disconnect() end
-                if not egg.Parent then
-                    smartWait(PICKUP_WAIT, myId, myPriority)
-                else
-                    blacklist[egg] = os.clock() + BLACKLIST_TIME
-                end
-            end
-
-            if enabled and runId == myId and taskPriority == myPriority then
-                local spawnCF = getGameSpawnCFrame()
-                teleportTo(spawnCF.Position, myId, myPriority, false)
-                smartWait(0.3, myId, myPriority)
-                if dynamicBaseCFrame then
-                    returnToBase(dynamicBaseCFrame, myId, myPriority, false)
-                end
-            end
-
-            if not smartWait(LOOP_DELAY, myId, myPriority) then break end
-        end
-        setNoclip(false)
-        stopMovement()
-    end)
-end
-
-local function stopLogic()
-    enabled = false
-    isPaused = false
-    runId = runId + 1
-    taskPriority = taskPriority + 1
-    clearConnections()
-    setNoclip(false)
-    stopMovement()
-    resetBtnStyles()
-
-    StartStopBtn.Text = "▶ 啟動腳本"
-    StartStopBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 80)
-    PauseBtn.Text = "⏸ 暫停"
-    PauseBtn.BackgroundColor3 = Color3.fromRGB(55, 58, 68)
-    PauseBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
-end
-
-local function startLogic()
-    stopLogic()
-    enabled = true
-    isPaused = false
-
-    StartStopBtn.Text = "⏹ 停止腳本"
-    StartStopBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
-    PauseBtn.Text = "⏸ 暫停"
-    PauseBtn.BackgroundColor3 = Color3.fromRGB(45, 48, 56)
-    PauseBtn.TextColor3 = Color3.fromRGB(220, 220, 220)
-
-    startLoop()
-end
-
-StartStopBtn.MouseButton1Click:Connect(function()
-    if enabled then stopLogic() else startLogic() end
-end)
-
-PauseBtn.MouseButton1Click:Connect(function()
-    if not enabled then return end
-    isPaused = not isPaused
-    if isPaused then
-        PauseBtn.Text = "▶ 繼續"
-        PauseBtn.BackgroundColor3 = Color3.fromRGB(220, 140, 40)
-        PauseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    else
-        PauseBtn.Text = "⏸ 暫停"
-        PauseBtn.BackgroundColor3 = Color3.fromRGB(45, 48, 56)
-        PauseBtn.TextColor3 = Color3.fromRGB(220, 220, 220)
-    end
-end)
-
-SetHomeBtn.MouseButton1Click:Connect(function()
-    local _, _, root = getChar()
-    if root then
-        dynamicBaseCFrame = root.CFrame
-        SetHomeBtn.Text = "✅"
-        task.delay
+        table.insert(
