@@ -349,7 +349,6 @@ local function setTargetCFrame(targetCF)
     end
 end
 
--- 🌊 平滑漂移移動函數 (高速 Tween)
 local function driftTo(targetCFrame, duration, myId, myPriority)
     local targetPart, targetModel = getMoveTarget()
     if not targetPart then return false end
@@ -435,14 +434,17 @@ local function teleportTo(pos, myId, myPriority, ignoreState)
     return false
 end
 
+-- 🛡️ 安全的互動提示觸發（防止 nil 報錯）
 local function interactPrompt(prompt)
     pcall(function()
-        if fireproximityprompt then
-            fireproximityprompt(prompt)
-        else
-            prompt:InputHoldBegin()
-            task.wait(prompt.HoldDuration or 0)
-            prompt:InputHoldEnd()
+        if prompt and prompt:IsA("ProximityPrompt") then
+            if type(fireproximityprompt) == "function" then
+                fireproximityprompt(prompt)
+            else
+                prompt:InputHoldBegin()
+                task.wait(prompt.HoldDuration or 0)
+                prompt:InputHoldEnd()
+            end
         end
     end)
 end
@@ -468,7 +470,6 @@ local function findNearestEgg(root)
     return best, bestPos
 end
 
--- 高速返回基地 (SPEED = 280)[cite: 3, 5]
 local function returnToBase(originCFrame, myId, myPriority, isManual)
     local done = false
     local lastTime = os.clock()
@@ -572,16 +573,13 @@ local function startLoop()
 
             local currentEggName = tostring(egg.Name)
 
-            -- 🔴 若為 Volcanic Egg，走專屬 A ➔ B 路線
             if currentEggName == "Volcanic Egg" then
                 if not driftTo(POS_A, 0.6, myId, myPriority) then break end
                 if not driftTo(POS_B, 0.4, myId, myPriority) then break end
             end
 
-            -- 1. 前往目標蛋
             if not teleportTo(eggPos, myId, myPriority, false) then break end
 
-            -- 2. 鎖定位置
             local lockCF = CFrame.new(eggPos + TP_OFFSET)
             local lockConn
             lockConn = RunService.Heartbeat:Connect(function()
@@ -598,7 +596,6 @@ local function startLoop()
                 break
             end
 
-            -- 3. 觸發 Prompt
             local t0 = os.clock()
             while enabled and runId == myId and taskPriority == myPriority and egg.Parent and (os.clock() - t0 < HOLD_TIMEOUT) do
                 while isPaused do task.wait(0.05) end
@@ -613,7 +610,6 @@ local function startLoop()
             if lockConn and lockConn.Connected then lockConn:Disconnect() end
             if not enabled or runId ~= myId or taskPriority ~= myPriority then break end
 
-            -- 4. 判定結果
             local picked = not egg.Parent
             if picked then
                 if not smartWait(PICKUP_WAIT, myId, myPriority) then break end
@@ -623,7 +619,6 @@ local function startLoop()
 
             if not enabled or runId ~= myId or taskPriority ~= myPriority then break end
 
-            -- 5. 直接高速飄回基地（速度 280）
             if savedOriginCFrame then
                 returnToBase(savedOriginCFrame, myId, myPriority, false)
             end
@@ -635,8 +630,6 @@ local function startLoop()
         stopMovement()
     end)
 end
-
--- ===== UI 狀態控制 =====
 
 local function stopLogic()
     enabled = false
@@ -671,8 +664,6 @@ local function startLogic()
     startLoop()
 end
 
--- ===== 按鈕事件綁定 =====
-
 StartStopBtn.MouseButton1Click:Connect(function()
     if enabled then stopLogic() else startLogic() end
 end)
@@ -691,7 +682,6 @@ PauseBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- ⚙ 右上角設定基地按鈕[cite: 3]
 SetHomeBtn.MouseButton1Click:Connect(function()
     local _, _, root = getChar()
     if root then
@@ -705,7 +695,6 @@ SetHomeBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- 🏠 飄回基地按鈕[cite: 3]
 ReturnBtn.MouseButton1Click:Connect(function()
     if enabled then stopLogic() end
 
@@ -729,7 +718,6 @@ ReturnBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- 🌀 傳送回世界原點[cite: 3]
 TpSpawnBtn.MouseButton1Click:Connect(function()
     if enabled then stopLogic() end
 
@@ -742,14 +730,13 @@ TpSpawnBtn.MouseButton1Click:Connect(function()
 
     task.spawn(function()
         local spawnCF = getGameSpawnCFrame()
-        teleportTo(spawnCF.Position, runId, myPriority, true)
+        teleportTo(spawnCF.Position, myId, myPriority, true)
         if taskPriority == myPriority then
             resetBtnStyles()
         end
     end)
 end)
 
--- ⚡ 瞬移至指定座標[cite: 3, 5]
 TpCustomBtn.MouseButton1Click:Connect(function()
     if enabled then stopLogic() end
 
