@@ -588,7 +588,7 @@ end
 
 -- ===== 自動巡邏/採集核心 =====
 local function startLoop()
-    runId += 1
+    runId = runId + 1
     local myId = runId
     local myPriority = taskPriority
 
@@ -724,8 +724,8 @@ end
 local function stopLogic()
     enabled = false
     isPaused = false
-    runId += 1
-    taskPriority += 1
+    runId = runId + 1
+    taskPriority = taskPriority + 1
     clearConnections()
     setNoclip(false)
     stopMovement()
@@ -790,7 +790,7 @@ end)
 ReturnBtn.MouseButton1Click:Connect(function()
     if enabled then stopLogic() end
 
-    taskPriority += 1
+    taskPriority = taskPriority + 1
     local myPriority = taskPriority
 
     resetBtnStyles()
@@ -798,94 +798,4 @@ ReturnBtn.MouseButton1Click:Connect(function()
     ReturnBtn.BackgroundColor3 = Color3.fromRGB(200, 140, 40)[cite: 1]
 
     local _, _, root = getChar()
-    local targetOrigin = savedOriginCFrame or (root and root.CFrame)
-
-    if targetOrigin then
-        task.spawn(function()
-            returnToBase(targetOrigin, runId, myPriority, true)
-            if taskPriority == myPriority then
-                resetBtnStyles()
-            end
-        end)
-    end
-end)
-
-TpCustomBtn.MouseButton1Click:Connect(function()
-    if enabled then stopLogic() end
-
-    taskPriority += 1
-    local myPriority = taskPriority
-
-    resetBtnStyles()
-    TpCustomBtn.Text = "⚡ 移動中..."[cite: 1]
-    TpCustomBtn.BackgroundColor3 = Color3.fromRGB(200, 140, 40)[cite: 1]
-
-    task.spawn(function()
-        teleportTo(customTargetPos, runId, myPriority, true)
-        if taskPriority == myPriority then
-            resetBtnStyles()
-        end
-    end)
-end)
-
--- 傳送至點 A 按鈕綁定
-TpABtn.MouseButton1Click:Connect(function()
-    if enabled then stopLogic() end
-
-    taskPriority += 1
-    local myPriority = taskPriority
-
-    resetBtnStyles()
-    TpABtn.Text = "📍 傳送至 A 中..."
-    TpABtn.BackgroundColor3 = Color3.fromRGB(200, 140, 40)
-
-    task.spawn(function()
-        teleportTo(POS_A, runId, myPriority, true)
-        if taskPriority == myPriority then
-            resetBtnStyles()
-        end
-    end)
-end)
-
--- 傳送至點 B 按鈕綁定
-TpBBtn.MouseButton1Click:Connect(function()
-    if enabled then stopLogic() end
-
-    taskPriority += 1
-    local myPriority = taskPriority
-
-    resetBtnStyles()
-    TpBBtn.Text = "📍 傳送至 B 中..."
-    TpBBtn.BackgroundColor3 = Color3.fromRGB(200, 140, 40)
-
-    task.spawn(function()
-        teleportTo(POS_B, runId, myPriority, true)
-        if taskPriority == myPriority then
-            resetBtnStyles()
-        end
-    end)
-end)
-
-TpSpawnBtn.MouseButton1Click:Connect(function()
-    if enabled then stopLogic() end
-
-    taskPriority += 1
-    local myPriority = taskPriority
-
-    resetBtnStyles()
-    TpSpawnBtn.Text = "🌀 傳送中..."[cite: 1]
-    TpSpawnBtn.BackgroundColor3 = Color3.fromRGB(200, 140, 40)[cite: 1]
-
-    task.spawn(function()
-        local spawnCF = getGameSpawnCFrame()
-        teleportTo(spawnCF, runId, myPriority, true)
-        if taskPriority == myPriority then
-            resetBtnStyles()
-        end
-    end)
-end)
-
-CloseBtn.MouseButton1Click:Connect(function()
-    stopLogic()
-    ScreenGui:Destroy()
-end)
+    local targetOrigin = savedOriginCFrame
