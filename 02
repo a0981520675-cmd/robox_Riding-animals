@@ -16,7 +16,7 @@ local player = Players.LocalPlayer
 local enabled = false
 local isPaused = false
 local runId = 0
-local taskPriority = 0 -- 🎯 最高優先級計數器
+local taskPriority = 0
 local blacklist = {}
 local activeConnections = {}
 
@@ -202,7 +202,7 @@ TpCustomBtn.Parent = MainFrame
 
 local TpCustomCorner = Instance.new("UICorner")
 TpCustomCorner.CornerRadius = UDim.new(0, 6)
-TpCustomCorner.Parent = TpCustomBtn
+TpSpawnCorner = Instance.new("UICorner")
 
 local TpSpawnBtn = Instance.new("TextButton")
 TpSpawnBtn.Name = "TpSpawnBtn"
@@ -215,7 +215,6 @@ TpSpawnBtn.TextSize = 14
 TpSpawnBtn.Font = Enum.Font.GothamBold
 TpSpawnBtn.Parent = MainFrame
 
-local TpSpawnCorner = Instance.new("UICorner")
 TpSpawnCorner.CornerRadius = UDim.new(0, 6)
 TpSpawnCorner.Parent = TpSpawnBtn
 
@@ -562,25 +561,29 @@ local function startLoop()
 
             savedOriginCFrame = savedOriginCFrame or root.CFrame
 
-            -- 尋找目標蛋
+            -- 1. 搜尋蛋
             local egg, eggPos = findNearestEgg(root)
             if not egg then
-                -- ❌ 沒蛋時原地停留，不移動
                 if not smartWait(0.3, myId, myPriority) then break end
                 continue
             end
 
-            -- 🛑 防跌倒狀態鎖定
+            -- 🛑 啟用防跌倒保護
             hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
             hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
 
+            local currentEggName = tostring(egg.Name)
             local targetEggCF = CFrame.new(eggPos + TP_OFFSET)
 
+            print("[EggCollector] 當前發現蛋類名稱: " .. currentEggName)
+
             --------------------------------------------------------------------
-            -- 🟡 專屬流程 A：只有在【確定蛋是 Cherub Egg】時，才執行 A➔B 路線
+            -- 🟡 分流 1：嚴格限定當蛋名稱【完全等於 Cherub Egg】才走 A ➔ B 路線
             --------------------------------------------------------------------
-            if egg.Name == "Cherub Egg" then
-                print("🥚 偵測到 Cherub Egg！執行 A ➔ B ➔ 蛋 ➔ B ➔ A 專用路線...")
+            if currentEggName == "Cherub Egg" then
+                print("==========================================")
+                print("[Cherub Route] 觸發 Cherub Egg 專用漂移路線！")
+                print("==========================================")
 
                 -- 1. 漂移至地點 A
                 if not driftTo(POS_A, 2.5, myId, myPriority) then break end
@@ -624,20 +627,22 @@ local function startLoop()
                     blacklist[egg] = os.clock() + BLACKLIST_TIME
                 end
 
-                -- 6. Cherub Egg 採集完成：返程 (回到 B ➔ 回到 A)
+                -- 6. Cherub 返程路線 (回點 B ➔ 回點 A)
                 if enabled and runId == myId and taskPriority == myPriority then
+                    print("[Cherub Route] 採集完畢，漂移返回 B 點...")
                     driftTo(POS_B, 1.2, myId, myPriority)
                     smartWait(0.1, myId, myPriority)
 
+                    print("[Cherub Route] 漂移返回 A 點...")
                     driftTo(POS_A, 2.0, myId, myPriority)
                     smartWait(0.1, myId, myPriority)
                 end
 
             --------------------------------------------------------------------
-            -- 🔵 專屬流程 B：其他任何蛋（Volcanic/Solaris/Blackhole），直接傳送
+            -- 🔵 分流 2：非 Cherub Egg 的其他所有蛋（直接瞬移）
             --------------------------------------------------------------------
             else
-                print("🥚 偵測到 " .. egg.Name .. "！執行一般直接傳送...")
+                print("[Normal Route] 執行一般蛋直接傳送: " .. currentEggName)
 
                 -- 1. 直接傳送到蛋的位置
                 if not teleportTo(eggPos, myId, myPriority, false) then break end
@@ -674,8 +679,9 @@ local function startLoop()
                 end
             end
 
-            -- 7. 兩種蛋拿完後，統一平滑返回基地 (原點)
+            -- 7. 返回基地
             if enabled and runId == myId and taskPriority == myPriority and savedOriginCFrame then
+                print("[Base Route] 返回基地...")
                 returnToBase(savedOriginCFrame, myId, myPriority, false)
             end
 
