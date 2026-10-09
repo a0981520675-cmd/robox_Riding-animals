@@ -23,14 +23,14 @@ local activeConnections = {}
 -- 自訂記錄的原點位置
 local savedOriginCFrame = nil
 
--- 📍 精確 A、B 點中轉座標 (Cherub Egg 專用路線)
+-- 📍 Cherub Egg 專用 A、B 中轉座標
 local POS_A = CFrame.new(-4888.9, 41278.3, -3735.4) -- 地點 A
 local POS_B = CFrame.new(-4972.4, 41285.8, -3645.5) -- 地點 B
 
 -- 指定瞬移座標
 local customTargetPos = Vector3.new(-5072, 41405, -3447)
 
--- ===== 遊戲預設出生點 (Spawn Point) 設定 =====
+-- ===== 遊戲預設出生點 =====
 local DEFAULT_SPAWN_POS = Vector3.new(0, 50, 0)
 
 local function getGameSpawnCFrame()
@@ -43,17 +43,16 @@ local function getGameSpawnCFrame()
     end
     return CFrame.new(DEFAULT_SPAWN_POS)
 end
--- =============================================
 
 -- ===== 可調整設定 =====
 local BLACKLIST_TIME = 15                 -- 失敗的蛋暫時跳過幾秒
-local TP_OFFSET = Vector3.new(0, 4, 0)     -- 瞬移/漂移到蛋時的高度偏移
+local TP_OFFSET = Vector3.new(0, 4, 0)     -- 高度偏移
 local STEP_DIST = 75                       -- 分段移動每段最大距離
 local SYNC_WAIT = 0.28                     -- 移動後等待伺服器同步
 local HOLD_TIMEOUT = 3                     -- 最多停留幾秒等蛋被拿走
 local RETRY_INTERVAL = 0.3                 -- 重複觸發 Prompt 的間隔
 local PICKUP_WAIT = 0.6                    -- 拿到蛋後等待多久才出發
-local RETURN_SPEED = 280                   -- 回基地/原點速度
+local RETURN_SPEED = 280                   -- 回基地速度
 local HOME_HOLD = 0.5                      -- 到基地後停留鎖定幾秒
 local LOOP_DELAY = 0.3                     -- 每輪間隔
 -- ======================================
@@ -82,7 +81,6 @@ local MainUICorner = Instance.new("UICorner")
 MainUICorner.CornerRadius = UDim.new(0, 8)
 MainUICorner.Parent = MainFrame
 
--- 頂部拖動與標題列
 local TopBar = Instance.new("Frame")
 TopBar.Name = "TopBar"
 TopBar.Size = UDim2.new(1, 0, 0, 32)
@@ -415,7 +413,7 @@ local function teleportTo(pos, myId, myPriority, ignoreState)
                 return false 
             end
         else
-            if myPriority and taskPriority ~= myPriority then
+            if myPriority and taskPriority ~= myPriority me then
                 setNoclip(false)
                 return false
             end
@@ -445,6 +443,7 @@ local function interactPrompt(prompt)
     end)
 end
 
+-- 🔍 精確搜尋蛋函數（精確返回物件與名稱）
 local function findNearestEgg(root)
     local folder = Workspace:FindFirstChild("RenderedEggs")
     if not folder then return end
@@ -538,7 +537,7 @@ local function returnToBase(originCFrame, myId, myPriority, isManual)
     end
 end
 
--- ===== 自動巡邏/採集核心 (分流 Cherub Egg 路線) =====
+-- ===== 自動巡邏/採集核心 (嚴格判斷 Cherub Egg 才走 A➔B 路線) =====
 local function startLoop()
     runId += 1
     local myId = runId
@@ -563,23 +562,26 @@ local function startLoop()
 
             savedOriginCFrame = savedOriginCFrame or root.CFrame
 
+            -- 1. 尋找附近的蛋
             local egg, eggPos = findNearestEgg(root)
             if not egg then
+                -- ❌ 完全沒找到任何蛋，原地等待，絕對不移動
                 if not smartWait(0.3, myId, myPriority) then break end
                 continue
             end
 
-            -- 🛑 防跌倒狀態鎖定
+            -- 🛑 啟用防跌倒保護
             hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
             hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
 
             local targetEggCF = CFrame.new(eggPos + TP_OFFSET)
+            local eggName = egg.Name
 
             -------------------------------------------------------------
-            -- 🥚 情況一：只有偵測到 Cherub Egg 時，執行 A ➔ B ➔ 蛋 ➔ B ➔ A 路線
+            -- 🥚 情況一：只有在找到 Cherub Egg 時，才執行 A ➔ B ➔ 蛋 路線
             -------------------------------------------------------------
-            if egg.Name == "Cherub Egg" then
-                print("🥚 偵測到 Cherub Egg！啟動 Cherub 專用漂移路線...")
+            if eggName == "Cherub Egg" then
+                print("🥚 真正找到 Cherub Egg！啟動 A ➔ B ➔ Cherub Egg 路線...")
                 
                 -- 1. 漂移至地點 A
                 if not driftTo(POS_A, 2.5, myId, myPriority) then break end
@@ -589,18 +591,18 @@ local function startLoop()
                 if not driftTo(POS_B, 2.0, myId, myPriority) then break end
                 if not smartWait(0.1, myId, myPriority) then break end
 
-                -- 3. 漂移前往蛋的位置
+                -- 3. 漂移前往 Cherub Egg
                 if not driftTo(targetEggCF, 1.2, myId, myPriority) then break end
 
             -------------------------------------------------------------
-            -- 🥚 情況二：其他一般蛋，直接傳送過去
+            -- 🥚 情況二：找到其他蛋（如 Volcanic Egg），直接分段傳送
             -------------------------------------------------------------
             else
-                print("🥚 偵測到 " .. egg.Name .. "，執行直接傳送...")
+                print("🥚 找到 " .. eggName .. "，執行直接傳送...")
                 if not teleportTo(eggPos, myId, myPriority, false) then break end
             end
 
-            -- 4. 鎖定位置準備拿蛋
+            -- 4. 鎖定位置準備採集
             local lockConn
             lockConn = RunService.Heartbeat:Connect(function()
                 if enabled and not isPaused and runId == myId and taskPriority == myPriority then
@@ -631,7 +633,7 @@ local function startLoop()
             if lockConn and lockConn.Connected then lockConn:Disconnect() end
             if not enabled or runId ~= myId or taskPriority ~= myPriority then break end
 
-            -- 6. 判定結果
+            -- 6. 判定採集結果
             local picked = not egg.Parent
             if picked then
                 if not smartWait(PICKUP_WAIT, myId, myPriority) then break end
@@ -644,8 +646,8 @@ local function startLoop()
             -------------------------------------------------------------
             -- 🥚 拿完蛋後的返程路線
             -------------------------------------------------------------
-            if egg.Name == "Cherub Egg" then
-                -- 7. Cherub Egg 專用返程：回點 B ➔ 回點 A
+            if eggName == "Cherub Egg" then
+                -- Cherub Egg 採集完成：漂移回 B ➔ 漂移回 A
                 if not driftTo(POS_B, 1.2, myId, myPriority) then break end
                 if not smartWait(0.1, myId, myPriority) then break end
 
@@ -653,7 +655,7 @@ local function startLoop()
                 if not smartWait(0.1, myId, myPriority) then break end
             end
 
-            -- 8. 最後返回基地 (原點)
+            -- 7. 返回基地 (原點)
             if savedOriginCFrame then
                 returnToBase(savedOriginCFrame, myId, myPriority, false)
             end
