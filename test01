@@ -1,3 +1,5 @@
+if not game:IsLoaded() then game.Loaded:Wait() end
+
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local CoreGui = game:GetService("CoreGui")
@@ -70,7 +72,7 @@ ScreenGui.Parent = parentGui
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 220, 0, 260)
+MainFrame.Size = UDim2.new(0, 220, 0, 324)
 MainFrame.Position = UDim2.new(0.05, 0, 0.35, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 32, 38)
 MainFrame.BorderSizePixel = 0
@@ -219,6 +221,51 @@ local TpSpawnCorner = Instance.new("UICorner")
 TpSpawnCorner.CornerRadius = UDim.new(0, 6)
 TpSpawnCorner.Parent = TpSpawnBtn
 
+local TpABtn = Instance.new("TextButton")
+TpABtn.Name = "TpABtn"
+TpABtn.Size = UDim2.new(0, 96, 0, 40)
+TpABtn.Position = UDim2.new(0, 10, 0, 232)
+TpABtn.BackgroundColor3 = Color3.fromRGB(200, 90, 50)
+TpABtn.Text = "📍 傳送 A"
+TpABtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+TpABtn.TextSize = 14
+TpABtn.Font = Enum.Font.GothamBold
+TpABtn.Parent = MainFrame
+
+local TpACorner = Instance.new("UICorner")
+TpACorner.CornerRadius = UDim.new(0, 6)
+TpACorner.Parent = TpABtn
+
+local TpBBtn = Instance.new("TextButton")
+TpBBtn.Name = "TpBBtn"
+TpBBtn.Size = UDim2.new(0, 96, 0, 40)
+TpBBtn.Position = UDim2.new(0, 114, 0, 232)
+TpBBtn.BackgroundColor3 = Color3.fromRGB(60, 150, 70)
+TpBBtn.Text = "📍 傳送 B"
+TpBBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+TpBBtn.TextSize = 14
+TpBBtn.Font = Enum.Font.GothamBold
+TpBBtn.Parent = MainFrame
+
+local TpBCorner = Instance.new("UICorner")
+TpBCorner.CornerRadius = UDim.new(0, 6)
+TpBCorner.Parent = TpBBtn
+
+local ReconnectBtn = Instance.new("TextButton")
+ReconnectBtn.Name = "ReconnectBtn"
+ReconnectBtn.Size = UDim2.new(1, -20, 0, 34)
+ReconnectBtn.Position = UDim2.new(0, 10, 0, 280)
+ReconnectBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 80)
+ReconnectBtn.Text = "🔁 防重連：開"
+ReconnectBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ReconnectBtn.TextSize = 13
+ReconnectBtn.Font = Enum.Font.GothamBold
+ReconnectBtn.Parent = MainFrame
+
+local ReconnectCorner = Instance.new("UICorner")
+ReconnectCorner.CornerRadius = UDim.new(0, 6)
+ReconnectCorner.Parent = ReconnectBtn
+
 -- ===== 拖動 UI 邏輯 =====
 local dragging = false
 local dragInput, dragStart, startPos
@@ -264,6 +311,12 @@ local function resetBtnStyles()
 
     TpSpawnBtn.Text = "🌀 傳送回遊戲原點"
     TpSpawnBtn.BackgroundColor3 = Color3.fromRGB(30, 140, 140)
+
+    TpABtn.Text = "📍 傳送 A"
+    TpABtn.BackgroundColor3 = Color3.fromRGB(200, 90, 50)
+
+    TpBBtn.Text = "📍 傳送 B"
+    TpBBtn.BackgroundColor3 = Color3.fromRGB(60, 150, 70)
 end
 
 local function clearConnections()
@@ -819,7 +872,147 @@ TpSpawnBtn.MouseButton1Click:Connect(function()
     end)
 end)
 
+local function bindPointBtn(btn, label, posCF)
+    btn.MouseButton1Click:Connect(function()
+        if enabled then stopLogic() end
+
+        taskPriority += 1
+        local myPriority = taskPriority
+
+        resetBtnStyles()
+        btn.Text = "⚡ 移動中..."
+        btn.BackgroundColor3 = Color3.fromRGB(200, 140, 40)
+
+        task.spawn(function()
+            -- 減去 TP_OFFSET，讓最終落點剛好是 A / B 的原始座標
+            teleportTo(posCF.Position - TP_OFFSET, runId, myPriority, true)
+            if taskPriority == myPriority then
+                resetBtnStyles()
+            end
+        end)
+    end)
+end
+
+bindPointBtn(TpABtn, "A", POS_A)
+bindPointBtn(TpBBtn, "B", POS_B)
+
+-- ===== 防重連 / 防斷線 =====
+local GuiService = game:GetService("GuiService")
+local TeleportService = game:GetService("TeleportService")
+local VirtualUser = game:GetService("VirtualUser")
+
+-- ⚙ 重連後要自動重新載入的腳本（留空 = 只重連，不自動載入）
+-- 範例（網址載入）：
+--   local AUTO_RELOAD_SOURCE = [[loadstring(game:HttpGet("https://你的網址/script.lua"))()]]
+-- 範例（本機檔案）：
+--   local AUTO_RELOAD_SOURCE = [[loadstring(readfile("腳本.lua"))()]]
+local AUTO_RELOAD_SOURCE = ""
+local REJOIN_RETRY = 5          -- 重連失敗後幾秒再試一次
+
+local antiReconnect = true
+local rejoining = false
+local reconnectConns = {}
+
+local function refreshReconnectBtn()
+    if antiReconnect then
+        ReconnectBtn.Text = "🔁 防重連：開"
+        ReconnectBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 80)
+    else
+        ReconnectBtn.Text = "🔁 防重連：關"
+        ReconnectBtn.BackgroundColor3 = Color3.fromRGB(70, 74, 86)
+    end
+end
+
+local function queueReload()
+    if AUTO_RELOAD_SOURCE == "" then return end
+    local q = queue_on_teleport
+        or (syn and syn.queue_on_teleport)
+        or (fluxus and fluxus.queue_on_teleport)
+    if not q then return end
+    -- 重連後自動啟動腳本並直接開始採集
+    pcall(q, "getgenv().AutoEggAutoStart = true\n" .. AUTO_RELOAD_SOURCE)
+end
+
+local function rejoin(reason)
+    if not antiReconnect or rejoining then return end
+    rejoining = true
+    warn("[防重連] 偵測到斷線：" .. tostring(reason) .. "，準備重新連線...")
+
+    queueReload()
+
+    task.spawn(function()
+        local attempt = 0
+        while antiReconnect do
+            attempt += 1
+            pcall(function()
+                if attempt % 2 == 1 and #Players:GetPlayers() > 1 then
+                    -- 優先回到同一個伺服器
+                    TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, player)
+                else
+                    -- 同伺服器失敗/只剩自己 → 進新伺服器
+                    TeleportService:Teleport(game.PlaceId, player)
+                end
+            end)
+            task.wait(REJOIN_RETRY)
+        end
+        rejoining = false
+    end)
+end
+
+-- 1) 被踢 / 斷線錯誤訊息
+table.insert(reconnectConns, GuiService.ErrorMessageChanged:Connect(function(msg)
+    if msg and msg ~= "" then
+        rejoin(msg)
+    end
+end))
+
+-- 2) 系統彈出的 ErrorPrompt（斷線視窗）
+task.spawn(function()
+    pcall(function()
+        local gui = CoreGui:WaitForChild("RobloxPromptGui", 15)
+        local overlay = gui and gui:WaitForChild("promptOverlay", 15)
+        if overlay then
+            table.insert(reconnectConns, overlay.ChildAdded:Connect(function(child)
+                if child.Name == "ErrorPrompt" then
+                    rejoin("ErrorPrompt")
+                end
+            end))
+        end
+    end)
+end)
+
+-- 3) 防閒置踢出（20 分鐘沒動作）
+table.insert(reconnectConns, player.Idled:Connect(function()
+    if not antiReconnect then return end
+    pcall(function()
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton2(Vector2.new())
+    end)
+end))
+
+ReconnectBtn.MouseButton1Click:Connect(function()
+    antiReconnect = not antiReconnect
+    refreshReconnectBtn()
+end)
+
 CloseBtn.MouseButton1Click:Connect(function()
+    antiReconnect = false
+    for _, c in ipairs(reconnectConns) do
+        if c and c.Connected then c:Disconnect() end
+    end
     stopLogic()
     ScreenGui:Destroy()
 end)
+
+-- 自動啟動（第一次執行、重連後都會自動開始採集）
+local AUTO_START = true      -- 改成 false 就恢復成手動按「啟動腳本」
+local genv = getgenv and getgenv()
+if genv then genv.AutoEggAutoStart = false end
+
+if AUTO_START then
+    task.spawn(function()
+        if not player.Character then player.CharacterAdded:Wait() end
+        task.wait(2)
+        if not enabled then startLogic() end
+    end)
+end
