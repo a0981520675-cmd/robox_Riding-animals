@@ -204,7 +204,7 @@ local TpCustomCorner = Instance.new("UICorner")
 TpCustomCorner.CornerRadius = UDim.new(0, 6)
 TpCustomCorner.Parent = TpCustomBtn
 
--- ===== 新增：傳送至點 A 按鈕 =====
+-- ===== 傳送至點 A 按鈕 =====
 local TpABtn = Instance.new("TextButton")
 TpABtn.Name = "TpABtn"
 TpABtn.Size = UDim2.new(1, -20, 0, 36)
@@ -220,7 +220,7 @@ local TpACorner = Instance.new("UICorner")
 TpACorner.CornerRadius = UDim.new(0, 6)
 TpACorner.Parent = TpABtn
 
--- ===== 新增：傳送至點 B 按鈕 =====
+-- ===== 傳送至點 B 按鈕 =====
 local TpBBtn = Instance.new("TextButton")
 TpBBtn.Name = "TpBBtn"
 TpBBtn.Size = UDim2.new(1, -20, 0, 36)
@@ -239,7 +239,7 @@ TpBCorner.Parent = TpBBtn
 local TpSpawnBtn = Instance.new("TextButton")
 TpSpawnBtn.Name = "TpSpawnBtn"
 TpSpawnBtn.Size = UDim2.new(1, -20, 0, 36)
-TpSpawnBtn.Position = UDim2.new(0, 10, 0, 248) -- 調整下方按鈕位置
+TpSpawnBtn.Position = UDim2.new(0, 10, 0, 248)
 TpSpawnBtn.BackgroundColor3 = Color3.fromRGB(30, 140, 140)[cite: 1]
 TpSpawnBtn.Text = "🌀 傳送回遊戲原點"[cite: 1]
 TpSpawnBtn.TextColor3 = Color3.fromRGB(255, 255, 255)[cite: 1]
@@ -417,9 +417,17 @@ local function driftTo(targetCFrame, duration, myId, myPriority)
     return true
 end
 
--- 普通分段傳送
+-- 分段傳送（相容 Vector3 與 CFrame）
 local function teleportTo(pos, myId, myPriority, ignoreState)
-    local targetPos = pos.Position + TP_OFFSET
+    local targetPos
+    if typeof(pos) == "CFrame" then
+        targetPos = pos.Position + TP_OFFSET
+    elseif typeof(pos) == "Vector3" then
+        targetPos = pos + TP_OFFSET
+    else
+        targetPos = Vector3.zero
+    end
+
     local targetPart = getMoveTarget()
     if not targetPart then return false end
 
@@ -817,7 +825,7 @@ TpCustomBtn.MouseButton1Click:Connect(function()
     end)
 end)
 
--- ===== 綁定：傳送至點 A =====
+-- 傳送至點 A
 TpABtn.MouseButton1Click:Connect(function()
     if enabled then stopLogic() end
 
@@ -836,7 +844,7 @@ TpABtn.MouseButton1Click:Connect(function()
     end)
 end)
 
--- ===== 綁定：傳送至點 B =====
+-- 傳送至點 B
 TpBBtn.MouseButton1Click:Connect(function()
     if enabled then stopLogic() end
 
