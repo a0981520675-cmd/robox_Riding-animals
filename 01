@@ -53,8 +53,8 @@ local SYNC_WAIT = 0.1                      -- 移動後等待伺服器同步
 local HOLD_TIMEOUT = 2                     -- 最多停留幾秒等蛋被拿走
 local RETRY_INTERVAL = 0.15                -- 快速連點 Prompt 的間隔
 local PICKUP_WAIT = 0.2                    -- 拿到蛋後準備出發
-local RETURN_SPEED = 220                   -- 回基地移動速度
-local HOME_HOLD = 1.0                      -- 到基地後停留並等待動態「放下」按鈕出現的秒數
+local RETURN_SPEED = 300                   -- 🚀 提升回基地移動速度
+local HOME_HOLD = 1.0                      -- 到基地後停留並點擊「放下」按鈕的秒數
 local LOOP_DELAY = 0.1                     -- 每輪間隔
 -- ======================================
 
@@ -441,7 +441,7 @@ local function interactPrompt(prompt)
     end)
 end
 
--- 🔍 動態偵測並點擊「放下」按鈕（支援先移動鼠標再點擊）
+-- 🔍 動態偵測並點擊「放下」按鈕
 local function clickDynamicDropButton()
     pcall(function()
         local playerGui = player:FindFirstChild("PlayerGui")
@@ -450,10 +450,8 @@ local function clickDynamicDropButton()
         for _, gui in ipairs(playerGui:GetDescendants()) do
             if gui:IsA("TextButton") and (gui.Text == "放下" or string.find(gui.Text, "放")) and gui.Visible then
                 local pos = gui.AbsolutePosition + (gui.AbsoluteSize / 2)
-                -- 1. 先移動滑鼠游標到按鈕位置 (模擬真實懸停)
                 VirtualInputManager:SendMouseMoveEvent(pos.X, pos.Y, game)
                 task.wait(0.05)
-                -- 2. 模擬滑鼠按下並放開
                 VirtualInputManager:SendMouseButtonEvent(pos.X, pos.Y, 0, true, game, 1)
                 task.wait(0.08)
                 VirtualInputManager:SendMouseButtonEvent(pos.X, pos.Y, 0, false, game, 1)
@@ -485,7 +483,7 @@ local function findNearestEgg(root)
     return best, bestPos
 end
 
--- 平滑返回基地 (SPEED = 220)
+-- 高速返回基地 (SPEED = 300)
 local function returnToBase(originCFrame, myId, myPriority, isManual)
     local done = false
     local lastTime = os.clock()
@@ -553,7 +551,7 @@ local function returnToBase(originCFrame, myId, myPriority, isManual)
     while (isManual or (enabled and runId == myId)) and (myPriority == nil or taskPriority == myPriority) and (os.clock() - t0 < HOME_HOLD) do
         while isPaused do task.wait(0.05) end
         setTargetCFrame(originCFrame)
-        -- 🎯 一到基地（此時蛋在頭上、動態按鈕已出現），持續掃描並點擊「放下」
+        -- 🎯 到基地後持續連點「放下」按鈕
         clickDynamicDropButton()
         task.wait(0.15)
     end
@@ -608,16 +606,10 @@ local function startLoop()
             if currentEggName == "Volcanic Egg" then
                 print("[Volcanic Route] 觸發 Volcanic Egg 專用 A ➔ B 極速路線！")
 
-                -- 1. 漂移至地點 A (0.6 秒)
                 if not driftTo(POS_A, 0.6, myId, myPriority) then break end
-
-                -- 2. 漂移至地點 B (0.4 秒)
                 if not driftTo(POS_B, 0.4, myId, myPriority) then break end
-
-                -- 3. 漂移前往 Volcanic Egg (0.3 秒)
                 if not driftTo(targetEggCF, 0.3, myId, myPriority) then break end
 
-                -- 4. 鎖定位置準備拿蛋
                 local lockConn = RunService.Heartbeat:Connect(function()
                     if enabled and not isPaused and runId == myId and taskPriority == myPriority then
                         setTargetCFrame(targetEggCF)
@@ -627,7 +619,6 @@ local function startLoop()
 
                 smartWait(SYNC_WAIT, myId, myPriority)
 
-                -- 5. 觸發 Prompt 拿蛋
                 local t0 = os.clock()
                 while enabled and runId == myId and taskPriority == myPriority and egg.Parent and (os.clock() - t0 < HOLD_TIMEOUT) do
                     while isPaused do task.wait(0.05) end
@@ -641,14 +632,12 @@ local function startLoop()
 
                 if lockConn and lockConn.Connected then lockConn:Disconnect() end
 
-                -- 判斷採集結果
                 if not egg.Parent then
                     smartWait(PICKUP_WAIT, myId, myPriority)
                 else
                     blacklist[egg] = os.clock() + BLACKLIST_TIME
                 end
 
-                -- 6. Volcanic 返程路線 (回點 B ➔ 回點 A)
                 if enabled and runId == myId and taskPriority == myPriority then
                     driftTo(POS_B, 0.3, myId, myPriority)
                     driftTo(POS_A, 0.5, myId, myPriority)
@@ -660,10 +649,8 @@ local function startLoop()
             else
                 print("[Normal Route] 執行一般蛋極速傳送: " .. currentEggName)
 
-                -- 1. 直接傳送到蛋的位置
                 if not teleportTo(eggPos, myId, myPriority, false) then break end
 
-                -- 2. 鎖定位置準備拿蛋
                 local lockConn = RunService.Heartbeat:Connect(function()
                     if enabled and not isPaused and runId == myId and taskPriority == myPriority then
                         setTargetCFrame(targetEggCF)
@@ -673,7 +660,6 @@ local function startLoop()
 
                 smartWait(SYNC_WAIT, myId, myPriority)
 
-                -- 3. 觸發 Prompt 拿蛋
                 local t0 = os.clock()
                 while enabled and runId == myId and taskPriority == myPriority and egg.Parent and (os.clock() - t0 < HOLD_TIMEOUT) do
                     while isPaused do task.wait(0.05) end
@@ -687,7 +673,6 @@ local function startLoop()
 
                 if lockConn and lockConn.Connected then lockConn:Disconnect() end
 
-                -- 判斷採集結果
                 if not egg.Parent then
                     smartWait(PICKUP_WAIT, myId, myPriority)
                 else
@@ -696,11 +681,18 @@ local function startLoop()
             end
 
             --------------------------------------------------------------------
-            -- 🌀 重點流程：拿完蛋後 ➔ 飄回基地 ➔ 動態偵測並點擊「放下」按鈕
+            -- 🌀 完整正確流程：拿完蛋後 ➔ 1. 瞬間傳送回世界原點（舉蛋） ➔ 2. 飛速飄回基地 ➔ 3. 點擊「放下」
             --------------------------------------------------------------------
             if enabled and runId == myId and taskPriority == myPriority then
+                -- 步驟 1：傳送至世界原點 (讓蛋舉在頭上)
+                print("[Spawn] 傳送至世界原點...")
+                local spawnCF = getGameSpawnCFrame()
+                teleportTo(spawnCF.Position, myId, myPriority, false)
+                smartWait(0.3, myId, myPriority)
+
+                -- 步驟 2：極速飄回動態基地並自動點擊放下
                 if dynamicBaseCFrame then
-                    print("[ReturnHome] 飄回基地，準備動態點擊「放下」...")
+                    print("[ReturnHome] 高速飄回基地並放下蛋...")
                     returnToBase(dynamicBaseCFrame, myId, myPriority, false)
                 end
             end
