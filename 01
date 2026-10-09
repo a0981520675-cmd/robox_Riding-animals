@@ -23,9 +23,9 @@ local activeConnections = {}
 -- 自訂記錄的原點位置
 local savedOriginCFrame = nil
 
--- 📍 點 A 與 點 B 座標
-local POS_A = CFrame.new(-4888.9, 41278.3, -3735.4)[cite: 1]
-local POS_B = CFrame.new(-4972.4, 41285.8, -3645.5)[cite: 1]
+-- 📍 Volcanic Egg 專用 A、B 中轉座標 (同時也是點 A 與點 B)
+local POS_A = CFrame.new(-4888.9, 41278.3, -3735.4) -- 地點 A[cite: 1]
+local POS_B = CFrame.new(-4972.4, 41285.8, -3645.5) -- 地點 B[cite: 1]
 
 -- 指定瞬移座標
 local customTargetPos = Vector3.new(-5072, 41405, -3447)[cite: 1]
@@ -70,7 +70,7 @@ ScreenGui.Parent = parentGui
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 220, 0, 340)
+MainFrame.Size = UDim2.new(0, 220, 0, 420) -- 調整高度以容納所有按鈕
 MainFrame.Position = UDim2.new(0.05, 0, 0.35, 0)[cite: 1]
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 32, 38)[cite: 1]
 MainFrame.BorderSizePixel = 0
@@ -204,7 +204,7 @@ local TpCustomCorner = Instance.new("UICorner")
 TpCustomCorner.CornerRadius = UDim.new(0, 6)
 TpCustomCorner.Parent = TpCustomBtn
 
--- ===== 傳送至點 A 按鈕 =====
+-- 📍 點 A 按鈕
 local TpABtn = Instance.new("TextButton")
 TpABtn.Name = "TpABtn"
 TpABtn.Size = UDim2.new(1, -20, 0, 36)
@@ -220,7 +220,7 @@ local TpACorner = Instance.new("UICorner")
 TpACorner.CornerRadius = UDim.new(0, 6)
 TpACorner.Parent = TpABtn
 
--- ===== 傳送至點 B 按鈕 =====
+-- 📍 點 B 按鈕
 local TpBBtn = Instance.new("TextButton")
 TpBBtn.Name = "TpBBtn"
 TpBBtn.Size = UDim2.new(1, -20, 0, 36)
@@ -417,20 +417,9 @@ local function driftTo(targetCFrame, duration, myId, myPriority)
     return true
 end
 
--- 通用傳送函數（完美支援 CFrame 與 Vector3）
-local function teleportTo(dest, myId, myPriority, ignoreState)
-    local targetPos, targetCF
-    
-    if typeof(dest) == "CFrame" then
-        targetCF = dest + TP_OFFSET
-        targetPos = targetCF.Position
-    elseif typeof(dest) == "Vector3" then
-        targetPos = dest + TP_OFFSET
-        targetCF = CFrame.new(targetPos)
-    else
-        return false
-    end
-
+-- 普通分段傳送
+local function teleportTo(pos, myId, myPriority, ignoreState)
+    local targetPos = pos.Position + TP_OFFSET
     local targetPart = getMoveTarget()
     if not targetPart then return false end
 
@@ -471,7 +460,7 @@ local function teleportTo(dest, myId, myPriority, ignoreState)
     end
 
     if (ignoreState or (enabled and runId == myId)) and (myPriority == nil or taskPriority == myPriority) then
-        setTargetCFrame(targetCF)
+        setTargetCFrame(CFrame.new(targetPos))
         setNoclip(false)
         return true
     end
@@ -644,158 +633,3 @@ local function startLoop()
                     end
                 end)
                 table.insert(activeConnections, lockConn)
-
-                smartWait(SYNC_WAIT, myId, myPriority)
-
-                local t0 = os.clock()
-                while enabled and runId == myId and taskPriority == myPriority and egg.Parent and (os.clock() - t0 < HOLD_TIMEOUT) do
-                    while isPaused do task.wait(0.05) end
-                    for _, v in ipairs(egg:GetDescendants()) do
-                        if v:IsA("ProximityPrompt") and v.Enabled then
-                            interactPrompt(v)
-                        end
-                    end
-                    if not smartWait(RETRY_INTERVAL, myId, myPriority) then break end
-                end
-
-                if lockConn and lockConn.Connected then lockConn:Disconnect() end
-
-                if not egg.Parent then
-                    smartWait(PICKUP_WAIT, myId, myPriority)
-                else
-                    blacklist[egg] = os.clock() + BLACKLIST_TIME
-                end
-
-                if enabled and runId == myId and taskPriority == myPriority then
-                    driftTo(POS_B, 1.2, myId, myPriority)
-                    smartWait(0.1, myId, myPriority)
-
-                    driftTo(POS_A, 2.0, myId, myPriority)
-                    smartWait(0.1, myId, myPriority)
-                end
-            else
-                print("[Normal Route] 執行一般蛋直接傳送: " .. currentEggName)
-
-                if not teleportTo(targetEggCF, myId, myPriority, false) then break end
-
-                local lockConn = RunService.Heartbeat:Connect(function()
-                    if enabled and not isPaused and runId == myId and taskPriority == myPriority then
-                        setTargetCFrame(targetEggCF)
-                    end
-                end)
-                table.insert(activeConnections, lockConn)
-
-                smartWait(SYNC_WAIT, myId, myPriority)
-
-                local t0 = os.clock()
-                while enabled and runId == myId and taskPriority == myPriority and egg.Parent and (os.clock() - t0 < HOLD_TIMEOUT) do
-                    while isPaused do task.wait(0.05) end
-                    for _, v in ipairs(egg:GetDescendants()) do
-                        if v:IsA("ProximityPrompt") and v.Enabled then
-                            interactPrompt(v)
-                        end
-                    end
-                    if not smartWait(RETRY_INTERVAL, myId, myPriority) then break end
-                end
-
-                if lockConn and lockConn.Connected then lockConn:Disconnect() end
-
-                if not egg.Parent then
-                    smartWait(PICKUP_WAIT, myId, myPriority)
-                else
-                    blacklist[egg] = os.clock() + BLACKLIST_TIME
-                end
-            end
-
-            if enabled and runId == myId and taskPriority == myPriority and savedOriginCFrame then
-                returnToBase(savedOriginCFrame, myId, myPriority, false)
-            end
-
-            if not smartWait(LOOP_DELAY, myId, myPriority) then break end
-        end
-
-        setNoclip(false)
-        stopMovement()
-    end)
-end
-
--- ===== UI 狀態刷新控制 =====
-
-local function stopLogic()
-    enabled = false
-    isPaused = false
-    runId = runId + 1
-    taskPriority = taskPriority + 1
-    clearConnections()
-    setNoclip(false)
-    stopMovement()
-    resetBtnStyles()
-
-    StartStopBtn.Text = "▶ 啟動腳本"[cite: 1]
-    StartStopBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 80)[cite: 1]
-
-    PauseBtn.Text = "⏸ 暫停"[cite: 1]
-    PauseBtn.BackgroundColor3 = Color3.fromRGB(55, 58, 68)[cite: 1]
-    PauseBtn.TextColor3 = Color3.fromRGB(150, 150, 150)[cite: 1]
-end
-
-local function startLogic()
-    stopLogic()
-    enabled = true
-    isPaused = false
-
-    StartStopBtn.Text = "⏹ 停止腳本"[cite: 1]
-    StartStopBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)[cite: 1]
-
-    PauseBtn.Text = "⏸ 暫停"[cite: 1]
-    PauseBtn.BackgroundColor3 = Color3.fromRGB(45, 48, 56)[cite: 1]
-    PauseBtn.TextColor3 = Color3.fromRGB(220, 220, 220)[cite: 1]
-
-    startLoop()
-end
-
--- ===== 按鈕事件綁定 =====
-
-StartStopBtn.MouseButton1Click:Connect(function()
-    if enabled then stopLogic() else startLogic() end
-end)
-
-PauseBtn.MouseButton1Click:Connect(function()
-    if not enabled then return end
-    isPaused = not isPaused
-    if isPaused then
-        PauseBtn.Text = "▶ 繼續"[cite: 1]
-        PauseBtn.BackgroundColor3 = Color3.fromRGB(220, 140, 40)[cite: 1]
-        PauseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)[cite: 1]
-    else
-        PauseBtn.Text = "⏸ 暫停"[cite: 1]
-        PauseBtn.BackgroundColor3 = Color3.fromRGB(45, 48, 56)[cite: 1]
-        PauseBtn.TextColor3 = Color3.fromRGB(220, 220, 220)[cite: 1]
-    end
-end)
-
-SetHomeBtn.MouseButton1Click:Connect(function()
-    local _, _, root = getChar()
-    if root then
-        savedOriginCFrame = root.CFrame
-        ReturnBtn.Text = "✅ 已更新原點"[cite: 1]
-        task.delay(1, function()
-            if ReturnBtn.Text == "✅ 已更新原點" then
-                ReturnBtn.Text = "🏠 飄回記錄原點"[cite: 1]
-            end
-        end)
-    end
-end)
-
-ReturnBtn.MouseButton1Click:Connect(function()
-    if enabled then stopLogic() end
-
-    taskPriority = taskPriority + 1
-    local myPriority = taskPriority
-
-    resetBtnStyles()
-    ReturnBtn.Text = "🚀 飄回中..."[cite: 1]
-    ReturnBtn.BackgroundColor3 = Color3.fromRGB(200, 140, 40)[cite: 1]
-
-    local _, _, root = getChar()
-    local targetOrigin = savedOriginCFrame
