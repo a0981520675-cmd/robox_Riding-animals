@@ -23,20 +23,15 @@ local activeConnections = {}
 -- 自訂記錄的原點位置
 local savedOriginCFrame = nil
 
--- 📍 點 A 與 點 B 座標函數
-local function getPOS_A()
-    return CFrame.new(-4888.9, 41278.3, -3735.4)
-end
-
-local function getPOS_B()
-    return CFrame.new(-4972.4, 41285.8, -3645.5)
-end
+-- 📍 點 A 與 點 B 座標
+local POS_A = CFrame.new(-4888.9, 41278.3, -3735.4)[cite: 1]
+local POS_B = CFrame.new(-4972.4, 41285.8, -3645.5)[cite: 1]
 
 -- 指定瞬移座標
-local customTargetPos = Vector3.new(-5072, 41405, -3447)
+local customTargetPos = Vector3.new(-5072, 41405, -3447)[cite: 1]
 
 -- ===== 遊戲預設出生點 =====
-local DEFAULT_SPAWN_POS = Vector3.new(0, 50, 0)
+local DEFAULT_SPAWN_POS = Vector3.new(0, 50, 0)[cite: 1]
 
 local function getGameSpawnCFrame()
     local spawnObj = Workspace:FindFirstChildOfClass("SpawnLocation") 
@@ -50,16 +45,16 @@ local function getGameSpawnCFrame()
 end
 
 -- ===== 可調整設定 =====
-local BLACKLIST_TIME = 15                 -- 失敗的蛋暫時跳過幾秒
-local TP_OFFSET = Vector3.new(0, 4, 0)     -- 高度偏移
-local STEP_DIST = 75                       -- 分段移動每段最大距離
-local SYNC_WAIT = 0.28                     -- 移動後等待伺服器同步
-local HOLD_TIMEOUT = 3                     -- 最多停留幾秒等蛋被拿走
-local RETRY_INTERVAL = 0.3                 -- 重複觸發 Prompt 的間隔
-local PICKUP_WAIT = 0.6                    -- 拿到蛋後等待多久才出發
-local RETURN_SPEED = 280                   -- 回基地速度
-local HOME_HOLD = 0.5                      -- 到基地後停留鎖定幾秒
-local LOOP_DELAY = 0.3                     -- 每輪間隔
+local BLACKLIST_TIME = 15                 -- 失敗的蛋暫時跳過幾秒[cite: 1]
+local TP_OFFSET = Vector3.new(0, 4, 0)     -- 高度偏移[cite: 1]
+local STEP_DIST = 75                       -- 分段移動每段最大距離[cite: 1]
+local SYNC_WAIT = 0.28                     -- 移動後等待伺服器同步[cite: 1]
+local HOLD_TIMEOUT = 3                     -- 最多停留幾秒等蛋被拿走[cite: 1]
+local RETRY_INTERVAL = 0.3                 -- 重複觸發 Prompt 的間隔[cite: 1]
+local PICKUP_WAIT = 0.6                    -- 拿到蛋後等待多久才出發[cite: 1]
+local RETURN_SPEED = 280                   -- 回基地速度[cite: 1]
+local HOME_HOLD = 0.5                      -- 到基地後停留鎖定幾秒[cite: 1]
+local LOOP_DELAY = 0.3                     -- 每輪間隔[cite: 1]
 -- ======================================
 
 -- 清理舊 UI
@@ -76,8 +71,8 @@ ScreenGui.Parent = parentGui
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Size = UDim2.new(0, 220, 0, 340)
-MainFrame.Position = UDim2.new(0.05, 0, 0.35, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(30, 32, 38)
+MainFrame.Position = UDim2.new(0.05, 0, 0.35, 0)[cite: 1]
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 32, 38)[cite: 1]
 MainFrame.BorderSizePixel = 0
 MainFrame.ClipsDescendants = true
 MainFrame.Parent = ScreenGui
@@ -88,18 +83,18 @@ MainUICorner.Parent = MainFrame
 
 local TopBar = Instance.new("Frame")
 TopBar.Name = "TopBar"
-TopBar.Size = UDim2.new(1, 0, 0, 32)
-TopBar.BackgroundColor3 = Color3.fromRGB(20, 22, 26)
+TopBar.Size = UDim2.new(1, 0, 0, 32)[cite: 1]
+TopBar.BackgroundColor3 = Color3.fromRGB(20, 22, 26)[cite: 1]
 TopBar.BorderSizePixel = 0
 TopBar.Parent = MainFrame
 
 local TitleLabel = Instance.new("TextLabel")
 TitleLabel.Name = "Title"
-TitleLabel.Size = UDim2.new(1, -70, 1, 0)
-TitleLabel.Position = UDim2.new(0, 10, 0, 0)
+TitleLabel.Size = UDim2.new(1, -70, 1, 0)[cite: 1]
+TitleLabel.Position = UDim2.new(0, 10, 0, 0)[cite: 1]
 TitleLabel.BackgroundTransparency = 1
-TitleLabel.Text = "Auto Egg Collector"
-TitleLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+TitleLabel.Text = "Auto Egg Collector"[cite: 1]
+TitleLabel.TextColor3 = Color3.fromRGB(220, 220, 220)[cite: 1]
 TitleLabel.TextSize = 13
 TitleLabel.Font = Enum.Font.GothamBold
 TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -107,18 +102,18 @@ TitleLabel.Parent = TopBar
 
 local ControlBox = Instance.new("Frame")
 ControlBox.Name = "ControlBox"
-ControlBox.Size = UDim2.new(0, 60, 1, 0)
-ControlBox.Position = UDim2.new(1, -60, 0, 0)
+ControlBox.Size = UDim2.new(0, 60, 1, 0)[cite: 1]
+ControlBox.Position = UDim2.new(1, -60, 0, 0)[cite: 1]
 ControlBox.BackgroundTransparency = 1
 ControlBox.Parent = TopBar
 
 local SetHomeBtn = Instance.new("TextButton")
 SetHomeBtn.Name = "SetHomeBtn"
-SetHomeBtn.Size = UDim2.new(0, 24, 0, 24)
-SetHomeBtn.Position = UDim2.new(0, 2, 0.5, -12)
-SetHomeBtn.BackgroundColor3 = Color3.fromRGB(45, 48, 56)
-SetHomeBtn.Text = "⚙"
-SetHomeBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+SetHomeBtn.Size = UDim2.new(0, 24, 0, 24)[cite: 1]
+SetHomeBtn.Position = UDim2.new(0, 2, 0.5, -12)[cite: 1]
+SetHomeBtn.BackgroundColor3 = Color3.fromRGB(45, 48, 56)[cite: 1]
+SetHomeBtn.Text = "⚙"[cite: 1]
+SetHomeBtn.TextColor3 = Color3.fromRGB(200, 200, 200)[cite: 1]
 SetHomeBtn.TextSize = 12
 SetHomeBtn.Font = Enum.Font.GothamBold
 SetHomeBtn.Parent = ControlBox
@@ -129,11 +124,11 @@ SetHomeCorner.Parent = SetHomeBtn
 
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Name = "CloseBtn"
-CloseBtn.Size = UDim2.new(0, 24, 0, 24)
-CloseBtn.Position = UDim2.new(0, 30, 0.5, -12)
-CloseBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-CloseBtn.Text = "✕"
-CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.Size = UDim2.new(0, 24, 0, 24)[cite: 1]
+CloseBtn.Position = UDim2.new(0, 30, 0.5, -12)[cite: 1]
+CloseBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)[cite: 1]
+CloseBtn.Text = "✕"[cite: 1]
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)[cite: 1]
 CloseBtn.TextSize = 12
 CloseBtn.Font = Enum.Font.GothamBold
 CloseBtn.Parent = ControlBox
@@ -144,18 +139,18 @@ CloseCorner.Parent = CloseBtn
 
 local ControlFrame = Instance.new("Frame")
 ControlFrame.Name = "ControlFrame"
-ControlFrame.Size = UDim2.new(1, -20, 0, 40)
-ControlFrame.Position = UDim2.new(0, 10, 0, 40)
+ControlFrame.Size = UDim2.new(1, -20, 0, 40)[cite: 1]
+ControlFrame.Position = UDim2.new(0, 10, 0, 40)[cite: 1]
 ControlFrame.BackgroundTransparency = 1
 ControlFrame.Parent = MainFrame
 
 local StartStopBtn = Instance.new("TextButton")
 StartStopBtn.Name = "StartStopBtn"
-StartStopBtn.Size = UDim2.new(0, 120, 1, 0)
-StartStopBtn.Position = UDim2.new(0, 0, 0, 0)
-StartStopBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 80)
-StartStopBtn.Text = "▶ 啟動腳本"
-StartStopBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+StartStopBtn.Size = UDim2.new(0, 120, 1, 0)[cite: 1]
+StartStopBtn.Position = UDim2.new(0, 0, 0, 0)[cite: 1]
+StartStopBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 80)[cite: 1]
+StartStopBtn.Text = "▶ 啟動腳本"[cite: 1]
+StartStopBtn.TextColor3 = Color3.fromRGB(255, 255, 255)[cite: 1]
 StartStopBtn.TextSize = 13
 StartStopBtn.Font = Enum.Font.GothamBold
 StartStopBtn.Parent = ControlFrame
@@ -166,11 +161,11 @@ StartStopCorner.Parent = StartStopBtn
 
 local PauseBtn = Instance.new("TextButton")
 PauseBtn.Name = "PauseBtn"
-PauseBtn.Size = UDim2.new(0, 75, 1, 0)
-PauseBtn.Position = UDim2.new(1, -75, 0, 0)
-PauseBtn.BackgroundColor3 = Color3.fromRGB(55, 58, 68)
-PauseBtn.Text = "⏸ 暫停"
-PauseBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
+PauseBtn.Size = UDim2.new(0, 75, 1, 0)[cite: 1]
+PauseBtn.Position = UDim2.new(1, -75, 0, 0)[cite: 1]
+PauseBtn.BackgroundColor3 = Color3.fromRGB(55, 58, 68)[cite: 1]
+PauseBtn.Text = "⏸ 暫停"[cite: 1]
+PauseBtn.TextColor3 = Color3.fromRGB(150, 150, 150)[cite: 1]
 PauseBtn.TextSize = 13
 PauseBtn.Font = Enum.Font.GothamBold
 PauseBtn.Parent = ControlFrame
@@ -182,10 +177,10 @@ PauseCorner.Parent = PauseBtn
 local ReturnBtn = Instance.new("TextButton")
 ReturnBtn.Name = "ReturnBtn"
 ReturnBtn.Size = UDim2.new(1, -20, 0, 36)
-ReturnBtn.Position = UDim2.new(0, 10, 0, 88)
-ReturnBtn.BackgroundColor3 = Color3.fromRGB(45, 110, 200)
-ReturnBtn.Text = "🏠 飄回記錄原點"
-ReturnBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ReturnBtn.Position = UDim2.new(0, 10, 0, 88)[cite: 1]
+ReturnBtn.BackgroundColor3 = Color3.fromRGB(45, 110, 200)[cite: 1]
+ReturnBtn.Text = "🏠 飄回記錄原點"[cite: 1]
+ReturnBtn.TextColor3 = Color3.fromRGB(255, 255, 255)[cite: 1]
 ReturnBtn.TextSize = 13
 ReturnBtn.Font = Enum.Font.GothamBold
 ReturnBtn.Parent = MainFrame
@@ -198,9 +193,9 @@ local TpCustomBtn = Instance.new("TextButton")
 TpCustomBtn.Name = "TpCustomBtn"
 TpCustomBtn.Size = UDim2.new(1, -20, 0, 36)
 TpCustomBtn.Position = UDim2.new(0, 10, 0, 128)
-TpCustomBtn.BackgroundColor3 = Color3.fromRGB(130, 60, 200)
-TpCustomBtn.Text = "⚡ 瞬移至指定座標"
-TpCustomBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+TpCustomBtn.BackgroundColor3 = Color3.fromRGB(130, 60, 200)[cite: 1]
+TpCustomBtn.Text = "⚡ 瞬移至指定座標"[cite: 1]
+TpCustomBtn.TextColor3 = Color3.fromRGB(255, 255, 255)[cite: 1]
 TpCustomBtn.TextSize = 13
 TpCustomBtn.Font = Enum.Font.GothamBold
 TpCustomBtn.Parent = MainFrame
@@ -245,9 +240,9 @@ local TpSpawnBtn = Instance.new("TextButton")
 TpSpawnBtn.Name = "TpSpawnBtn"
 TpSpawnBtn.Size = UDim2.new(1, -20, 0, 36)
 TpSpawnBtn.Position = UDim2.new(0, 10, 0, 248)
-TpSpawnBtn.BackgroundColor3 = Color3.fromRGB(30, 140, 140)
-TpSpawnBtn.Text = "🌀 傳送回遊戲原點"
-TpSpawnBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+TpSpawnBtn.BackgroundColor3 = Color3.fromRGB(30, 140, 140)[cite: 1]
+TpSpawnBtn.Text = "🌀 傳送回遊戲原點"[cite: 1]
+TpSpawnBtn.TextColor3 = Color3.fromRGB(255, 255, 255)[cite: 1]
 TpSpawnBtn.TextSize = 13
 TpSpawnBtn.Font = Enum.Font.GothamBold
 TpSpawnBtn.Parent = MainFrame
@@ -293,11 +288,11 @@ end)
 -- ===== 核心功能邏輯 =====
 
 local function resetBtnStyles()
-    ReturnBtn.Text = "🏠 飄回記錄原點"
-    ReturnBtn.BackgroundColor3 = Color3.fromRGB(45, 110, 200)
+    ReturnBtn.Text = "🏠 飄回記錄原點"[cite: 1]
+    ReturnBtn.BackgroundColor3 = Color3.fromRGB(45, 110, 200)[cite: 1]
 
-    TpCustomBtn.Text = "⚡ 瞬移至指定座標"
-    TpCustomBtn.BackgroundColor3 = Color3.fromRGB(130, 60, 200)
+    TpCustomBtn.Text = "⚡ 瞬移至指定座標"[cite: 1]
+    TpCustomBtn.BackgroundColor3 = Color3.fromRGB(130, 60, 200)[cite: 1]
 
     TpABtn.Text = "📍 傳送至點 A"
     TpABtn.BackgroundColor3 = Color3.fromRGB(200, 100, 50)
@@ -305,8 +300,8 @@ local function resetBtnStyles()
     TpBBtn.Text = "📍 傳送至點 B"
     TpBBtn.BackgroundColor3 = Color3.fromRGB(50, 140, 200)
 
-    TpSpawnBtn.Text = "🌀 傳送回遊戲原點"
-    TpSpawnBtn.BackgroundColor3 = Color3.fromRGB(30, 140, 140)
+    TpSpawnBtn.Text = "🌀 傳送回遊戲原點"[cite: 1]
+    TpSpawnBtn.BackgroundColor3 = Color3.fromRGB(30, 140, 140)[cite: 1]
 end
 
 local function clearConnections()
@@ -422,19 +417,18 @@ local function driftTo(targetCFrame, duration, myId, myPriority)
     return true
 end
 
--- 分段傳送（相容 Vector3 與 CFrame）
-local function teleportTo(pos, myId, myPriority, ignoreState)
-    local targetPos
-    local targetCF
-    if typeof(pos) == "CFrame" then
-        targetCF = pos + TP_OFFSET
+-- 通用傳送函數（完美支援 CFrame 與 Vector3）
+local function teleportTo(dest, myId, myPriority, ignoreState)
+    local targetPos, targetCF
+    
+    if typeof(dest) == "CFrame" then
+        targetCF = dest + TP_OFFSET
         targetPos = targetCF.Position
-    elseif typeof(pos) == "Vector3" then
-        targetPos = pos + TP_OFFSET
+    elseif typeof(dest) == "Vector3" then
+        targetPos = dest + TP_OFFSET
         targetCF = CFrame.new(targetPos)
     else
-        targetPos = Vector3.zero
-        targetCF = CFrame.new(targetPos)
+        return false
     end
 
     local targetPart = getMoveTarget()
@@ -636,10 +630,10 @@ local function startLoop()
                 print("[Volcanic Route] 觸發 Volcanic Egg 專用 A ➔ B 路線！")
                 print("==========================================")
 
-                if not driftTo(getPOS_A(), 2.5, myId, myPriority) then break end
+                if not driftTo(POS_A, 2.5, myId, myPriority) then break end
                 if not smartWait(0.1, myId, myPriority) then break end
 
-                if not driftTo(getPOS_B(), 2.0, myId, myPriority) then break end
+                if not driftTo(POS_B, 2.0, myId, myPriority) then break end
                 if not smartWait(0.1, myId, myPriority) then break end
 
                 if not driftTo(targetEggCF, 1.2, myId, myPriority) then break end
@@ -673,10 +667,10 @@ local function startLoop()
                 end
 
                 if enabled and runId == myId and taskPriority == myPriority then
-                    driftTo(getPOS_B(), 1.2, myId, myPriority)
+                    driftTo(POS_B, 1.2, myId, myPriority)
                     smartWait(0.1, myId, myPriority)
 
-                    driftTo(getPOS_A(), 2.0, myId, myPriority)
+                    driftTo(POS_A, 2.0, myId, myPriority)
                     smartWait(0.1, myId, myPriority)
                 end
             else
@@ -737,12 +731,12 @@ local function stopLogic()
     stopMovement()
     resetBtnStyles()
 
-    StartStopBtn.Text = "▶ 啟動腳本"
-    StartStopBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 80)
+    StartStopBtn.Text = "▶ 啟動腳本"[cite: 1]
+    StartStopBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 80)[cite: 1]
 
-    PauseBtn.Text = "⏸ 暫停"
-    PauseBtn.BackgroundColor3 = Color3.fromRGB(55, 58, 68)
-    PauseBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
+    PauseBtn.Text = "⏸ 暫停"[cite: 1]
+    PauseBtn.BackgroundColor3 = Color3.fromRGB(55, 58, 68)[cite: 1]
+    PauseBtn.TextColor3 = Color3.fromRGB(150, 150, 150)[cite: 1]
 end
 
 local function startLogic()
@@ -750,12 +744,12 @@ local function startLogic()
     enabled = true
     isPaused = false
 
-    StartStopBtn.Text = "⏹ 停止腳本"
-    StartStopBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+    StartStopBtn.Text = "⏹ 停止腳本"[cite: 1]
+    StartStopBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)[cite: 1]
 
-    PauseBtn.Text = "⏸ 暫停"
-    PauseBtn.BackgroundColor3 = Color3.fromRGB(45, 48, 56)
-    PauseBtn.TextColor3 = Color3.fromRGB(220, 220, 220)
+    PauseBtn.Text = "⏸ 暫停"[cite: 1]
+    PauseBtn.BackgroundColor3 = Color3.fromRGB(45, 48, 56)[cite: 1]
+    PauseBtn.TextColor3 = Color3.fromRGB(220, 220, 220)[cite: 1]
 
     startLoop()
 end
@@ -770,13 +764,13 @@ PauseBtn.MouseButton1Click:Connect(function()
     if not enabled then return end
     isPaused = not isPaused
     if isPaused then
-        PauseBtn.Text = "▶ 繼續"
-        PauseBtn.BackgroundColor3 = Color3.fromRGB(220, 140, 40)
-        PauseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        PauseBtn.Text = "▶ 繼續"[cite: 1]
+        PauseBtn.BackgroundColor3 = Color3.fromRGB(220, 140, 40)[cite: 1]
+        PauseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)[cite: 1]
     else
-        PauseBtn.Text = "⏸ 暫停"
-        PauseBtn.BackgroundColor3 = Color3.fromRGB(45, 48, 56)
-        PauseBtn.TextColor3 = Color3.fromRGB(220, 220, 220)
+        PauseBtn.Text = "⏸ 暫停"[cite: 1]
+        PauseBtn.BackgroundColor3 = Color3.fromRGB(45, 48, 56)[cite: 1]
+        PauseBtn.TextColor3 = Color3.fromRGB(220, 220, 220)[cite: 1]
     end
 end)
 
@@ -784,10 +778,10 @@ SetHomeBtn.MouseButton1Click:Connect(function()
     local _, _, root = getChar()
     if root then
         savedOriginCFrame = root.CFrame
-        ReturnBtn.Text = "✅ 已更新原點"
+        ReturnBtn.Text = "✅ 已更新原點"[cite: 1]
         task.delay(1, function()
             if ReturnBtn.Text == "✅ 已更新原點" then
-                ReturnBtn.Text = "🏠 飄回記錄原點"
+                ReturnBtn.Text = "🏠 飄回記錄原點"[cite: 1]
             end
         end)
     end
@@ -800,8 +794,8 @@ ReturnBtn.MouseButton1Click:Connect(function()
     local myPriority = taskPriority
 
     resetBtnStyles()
-    ReturnBtn.Text = "🚀 飄回中..."
-    ReturnBtn.BackgroundColor3 = Color3.fromRGB(200, 140, 40)
+    ReturnBtn.Text = "🚀 飄回中..."[cite: 1]
+    ReturnBtn.BackgroundColor3 = Color3.fromRGB(200, 140, 40)[cite: 1]
 
     local _, _, root = getChar()
     local targetOrigin = savedOriginCFrame or (root and root.CFrame)
@@ -823,8 +817,8 @@ TpCustomBtn.MouseButton1Click:Connect(function()
     local myPriority = taskPriority
 
     resetBtnStyles()
-    TpCustomBtn.Text = "⚡ 移動中..."
-    TpCustomBtn.BackgroundColor3 = Color3.fromRGB(200, 140, 40)
+    TpCustomBtn.Text = "⚡ 移動中..."[cite: 1]
+    TpCustomBtn.BackgroundColor3 = Color3.fromRGB(200, 140, 40)[cite: 1]
 
     task.spawn(function()
         teleportTo(customTargetPos, runId, myPriority, true)
@@ -834,7 +828,7 @@ TpCustomBtn.MouseButton1Click:Connect(function()
     end)
 end)
 
--- 傳送至點 A
+-- 傳送至點 A 按鈕綁定
 TpABtn.MouseButton1Click:Connect(function()
     if enabled then stopLogic() end
 
@@ -846,14 +840,14 @@ TpABtn.MouseButton1Click:Connect(function()
     TpABtn.BackgroundColor3 = Color3.fromRGB(200, 140, 40)
 
     task.spawn(function()
-        teleportTo(getPOS_A(), runId, myPriority, true)
+        teleportTo(POS_A, runId, myPriority, true)
         if taskPriority == myPriority then
             resetBtnStyles()
         end
     end)
 end)
 
--- 傳送至點 B
+-- 傳送至點 B 按鈕綁定
 TpBBtn.MouseButton1Click:Connect(function()
     if enabled then stopLogic() end
 
@@ -865,7 +859,7 @@ TpBBtn.MouseButton1Click:Connect(function()
     TpBBtn.BackgroundColor3 = Color3.fromRGB(200, 140, 40)
 
     task.spawn(function()
-        teleportTo(getPOS_B(), runId, myPriority, true)
+        teleportTo(POS_B, runId, myPriority, true)
         if taskPriority == myPriority then
             resetBtnStyles()
         end
@@ -879,8 +873,8 @@ TpSpawnBtn.MouseButton1Click:Connect(function()
     local myPriority = taskPriority
 
     resetBtnStyles()
-    TpSpawnBtn.Text = "🌀 傳送中..."
-    TpSpawnBtn.BackgroundColor3 = Color3.fromRGB(200, 140, 40)
+    TpSpawnBtn.Text = "🌀 傳送中..."[cite: 1]
+    TpSpawnBtn.BackgroundColor3 = Color3.fromRGB(200, 140, 40)[cite: 1]
 
     task.spawn(function()
         local spawnCF = getGameSpawnCFrame()
