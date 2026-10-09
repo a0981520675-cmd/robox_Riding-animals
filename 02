@@ -16,14 +16,14 @@ local player = Players.LocalPlayer
 local enabled = false
 local isPaused = false
 local runId = 0
-local taskPriority = 0 -- 🎯 最高優先級計數器（數字越大的任務優先）
+local taskPriority = 0 -- 🎯 最高優先級計數器
 local blacklist = {}
-local activeConnections = {} -- 紀錄所有運行中的連線以便即時切斷
+local activeConnections = {}
 
--- 自訂記錄的原點位置（預設會自動抓取開啟時的初始位置）
+-- 自訂記錄的原點位置
 local savedOriginCFrame = nil
 
--- 📍 精確 A、B 點中轉座標 (已填入你指定的數值)
+-- 📍 精確 A、B 點中轉座標 (Cherub Egg 專用路線)
 local POS_A = CFrame.new(-4888.9, 41278.3, -3735.4) -- 地點 A
 local POS_B = CFrame.new(-4972.4, 41285.8, -3645.5) -- 地點 B
 
@@ -31,7 +31,7 @@ local POS_B = CFrame.new(-4972.4, 41285.8, -3645.5) -- 地點 B
 local customTargetPos = Vector3.new(-5072, 41405, -3447)
 
 -- ===== 遊戲預設出生點 (Spawn Point) 設定 =====
-local DEFAULT_SPAWN_POS = Vector3.new(0, 50, 0) 
+local DEFAULT_SPAWN_POS = Vector3.new(0, 50, 0)
 
 local function getGameSpawnCFrame()
     local spawnObj = Workspace:FindFirstChildOfClass("SpawnLocation") 
@@ -53,7 +53,7 @@ local SYNC_WAIT = 0.28                     -- 移動後等待伺服器同步
 local HOLD_TIMEOUT = 3                     -- 最多停留幾秒等蛋被拿走
 local RETRY_INTERVAL = 0.3                 -- 重複觸發 Prompt 的間隔
 local PICKUP_WAIT = 0.6                    -- 拿到蛋後等待多久才出發
-local RETURN_SPEED = 280                   -- 回基地/原點速度（studs/秒）
+local RETURN_SPEED = 280                   -- 回基地/原點速度
 local HOME_HOLD = 0.5                      -- 到基地後停留鎖定幾秒
 local LOOP_DELAY = 0.3                     -- 每輪間隔
 -- ======================================
@@ -69,7 +69,6 @@ ScreenGui.Name = "AutoEggPathGui"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = parentGui
 
--- 主面板 (MainFrame)
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Size = UDim2.new(0, 220, 0, 260)
@@ -83,7 +82,7 @@ local MainUICorner = Instance.new("UICorner")
 MainUICorner.CornerRadius = UDim.new(0, 8)
 MainUICorner.Parent = MainFrame
 
--- 頂部拖動與標題列 (TopBar)
+-- 頂部拖動與標題列
 local TopBar = Instance.new("Frame")
 TopBar.Name = "TopBar"
 TopBar.Size = UDim2.new(1, 0, 0, 32)
@@ -103,7 +102,6 @@ TitleLabel.Font = Enum.Font.GothamBold
 TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
 TitleLabel.Parent = TopBar
 
--- 頂部控制按鈕容器
 local ControlBox = Instance.new("Frame")
 ControlBox.Name = "ControlBox"
 ControlBox.Size = UDim2.new(0, 60, 1, 0)
@@ -111,7 +109,6 @@ ControlBox.Position = UDim2.new(1, -60, 0, 0)
 ControlBox.BackgroundTransparency = 1
 ControlBox.Parent = TopBar
 
--- 右上角 重設自訂原點 按鈕 ⚙
 local SetHomeBtn = Instance.new("TextButton")
 SetHomeBtn.Name = "SetHomeBtn"
 SetHomeBtn.Size = UDim2.new(0, 24, 0, 24)
@@ -127,7 +124,6 @@ local SetHomeCorner = Instance.new("UICorner")
 SetHomeCorner.CornerRadius = UDim.new(0, 4)
 SetHomeCorner.Parent = SetHomeBtn
 
--- 右上角 關閉程式 (叉叉) 按鈕 ✕
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Name = "CloseBtn"
 CloseBtn.Size = UDim2.new(0, 24, 0, 24)
@@ -143,7 +139,6 @@ local CloseCorner = Instance.new("UICorner")
 CloseCorner.CornerRadius = UDim.new(0, 4)
 CloseCorner.Parent = CloseBtn
 
--- ===== 主控制區域：開關 & 暫停（並排顯示） =====
 local ControlFrame = Instance.new("Frame")
 ControlFrame.Name = "ControlFrame"
 ControlFrame.Size = UDim2.new(1, -20, 0, 40)
@@ -151,7 +146,6 @@ ControlFrame.Position = UDim2.new(0, 10, 0, 40)
 ControlFrame.BackgroundTransparency = 1
 ControlFrame.Parent = MainFrame
 
--- 左側：主開關按鈕 (啟動 / 停止)
 local StartStopBtn = Instance.new("TextButton")
 StartStopBtn.Name = "StartStopBtn"
 StartStopBtn.Size = UDim2.new(0, 120, 1, 0)
@@ -167,7 +161,6 @@ local StartStopCorner = Instance.new("UICorner")
 StartStopCorner.CornerRadius = UDim.new(0, 6)
 StartStopCorner.Parent = StartStopBtn
 
--- 右側：獨立暫停按鈕 (暫停 / 繼續)
 local PauseBtn = Instance.new("TextButton")
 PauseBtn.Name = "PauseBtn"
 PauseBtn.Size = UDim2.new(0, 75, 1, 0)
@@ -183,9 +176,6 @@ local PauseCorner = Instance.new("UICorner")
 PauseCorner.CornerRadius = UDim.new(0, 6)
 PauseCorner.Parent = PauseBtn
 
--- ===== 其他功能按鈕 =====
-
--- 一鍵飄回自訂原點按鈕
 local ReturnBtn = Instance.new("TextButton")
 ReturnBtn.Name = "ReturnBtn"
 ReturnBtn.Size = UDim2.new(1, -20, 0, 40)
@@ -201,7 +191,6 @@ local ReturnCorner = Instance.new("UICorner")
 ReturnCorner.CornerRadius = UDim.new(0, 6)
 ReturnCorner.Parent = ReturnBtn
 
--- 一鍵瞬移指定座標按鈕
 local TpCustomBtn = Instance.new("TextButton")
 TpCustomBtn.Name = "TpCustomBtn"
 TpCustomBtn.Size = UDim2.new(1, -20, 0, 40)
@@ -217,7 +206,6 @@ local TpCustomCorner = Instance.new("UICorner")
 TpCustomCorner.CornerRadius = UDim.new(0, 6)
 TpCustomCorner.Parent = TpCustomBtn
 
--- 一鍵傳送回遊戲出生原點按鈕
 local TpSpawnBtn = Instance.new("TextButton")
 TpSpawnBtn.Name = "TpSpawnBtn"
 TpSpawnBtn.Size = UDim2.new(1, -20, 0, 40)
@@ -269,7 +257,6 @@ end)
 
 -- ===== 核心功能邏輯 =====
 
--- 重設按鈕 UI 樣式為預設狀態
 local function resetBtnStyles()
     ReturnBtn.Text = "🏠 飄回記錄原點"
     ReturnBtn.BackgroundColor3 = Color3.fromRGB(45, 110, 200)
@@ -281,7 +268,6 @@ local function resetBtnStyles()
     TpSpawnBtn.BackgroundColor3 = Color3.fromRGB(30, 140, 140)
 end
 
--- 清理所有暫存連線
 local function clearConnections()
     for _, conn in ipairs(activeConnections) do
         if conn and conn.Connected then
@@ -291,7 +277,6 @@ local function clearConnections()
     table.clear(activeConnections)
 end
 
--- 取得角色與 Humanoid
 local function getChar()
     local char = player.Character
     if not char then return end
@@ -302,7 +287,6 @@ local function getChar()
     end
 end
 
--- 取得主要移動目標（角色或坐騎）
 local function getMoveTarget()
     local char, hum, root = getChar()
     if not char or not root then return end
@@ -316,7 +300,6 @@ local function getMoveTarget()
     return root, char, nil
 end
 
--- 🛠️ 移動期間關閉碰撞，防止卡牆
 local function setNoclip(toggle)
     local targetPart, targetModel = getMoveTarget()
     if not targetModel then return end
@@ -328,7 +311,6 @@ local function setNoclip(toggle)
     end
 end
 
--- 強制停下角色物理運動
 local function stopMovement()
     local targetPart = getMoveTarget()
     if targetPart and targetPart:IsA("BasePart") then
@@ -337,11 +319,9 @@ local function stopMovement()
     end
 end
 
--- ⚡ 可被即時中斷與暫停的等待函數
 local function smartWait(seconds, myId, myPriority)
     local t0 = os.clock()
     while enabled and runId == myId and (myPriority == nil or taskPriority == myPriority) and (os.clock() - t0 < seconds) do
-        -- 若處於暫停狀態，則在此原地等待
         while isPaused and enabled and runId == myId and (myPriority == nil or taskPriority == myPriority) do
             task.wait(0.05)
         end
@@ -350,7 +330,6 @@ local function smartWait(seconds, myId, myPriority)
     return enabled and not isPaused and runId == myId and (myPriority == nil or taskPriority == myPriority)
 end
 
--- 設置位置
 local function setTargetCFrame(targetCF)
     local targetPart, targetModel = getMoveTarget()
     if not targetPart then return end
@@ -402,7 +381,7 @@ local function driftTo(targetCFrame, duration, myId, myPriority)
     return true
 end
 
--- 去程/瞬移：無視牆壁的分段移動
+-- 普通傳送（分段移動）
 local function teleportTo(pos, myId, myPriority, ignoreState)
     local targetPos = pos + TP_OFFSET
     local targetPart = getMoveTarget()
@@ -411,7 +390,6 @@ local function teleportTo(pos, myId, myPriority, ignoreState)
     setNoclip(true)
 
     while (ignoreState or (enabled and runId == myId)) and (myPriority == nil or taskPriority == myPriority) do
-        -- 暫停卡住邏輯
         while isPaused and (ignoreState or (enabled and runId == myId)) and (myPriority == nil or taskPriority == myPriority) do
             task.wait(0.05)
         end
@@ -503,7 +481,7 @@ local function returnToBase(originCFrame, myId, myPriority, isManual)
             return
         end
 
-        if isPaused then return end -- 暫停時不移動
+        if isPaused then return end
 
         if not isManual and (not enabled or runId ~= myId) then
             done = true
@@ -552,7 +530,6 @@ local function returnToBase(originCFrame, myId, myPriority, isManual)
     if myPriority and taskPriority ~= myPriority then return end
     if not isManual and (not enabled or runId ~= myId) then return end
 
-    -- 原地鎖定
     local t0 = os.clock()
     while (isManual or (enabled and runId == myId)) and (myPriority == nil or taskPriority == myPriority) and (os.clock() - t0 < HOME_HOLD) do
         while isPaused do task.wait(0.05) end
@@ -561,7 +538,7 @@ local function returnToBase(originCFrame, myId, myPriority, isManual)
     end
 end
 
--- ===== 自動巡邏/採集核心 (已結合 A ➔ B ➔ 蛋 ➔ B ➔ A 漂移流程) =====
+-- ===== 自動巡邏/採集核心 (分流 Cherub Egg 路線) =====
 local function startLoop()
     runId += 1
     local myId = runId
@@ -574,7 +551,6 @@ local function startLoop()
         end
 
         while enabled and runId == myId and taskPriority == myPriority do
-            -- 暫停卡住
             while isPaused and enabled and runId == myId and taskPriority == myPriority do
                 task.wait(0.05)
             end
@@ -597,20 +573,34 @@ local function startLoop()
             hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
             hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
 
-            -- 🚀 1. 漂移至地點 A
-            print("🥚 偵測到目標蛋！啟動漂移路線前往地點 A...")
-            if not driftTo(POS_A, 2.5, myId, myPriority) then break end
-            if not smartWait(0.1, myId, myPriority) then break end
-
-            -- 🚀 2. 從地點 A 漂移至地點 B
-            if not driftTo(POS_B, 2.0, myId, myPriority) then break end
-            if not smartWait(0.1, myId, myPriority) then break end
-
-            -- 🚀 3. 從地點 B 漂移前往蛋的位置
             local targetEggCF = CFrame.new(eggPos + TP_OFFSET)
-            if not driftTo(targetEggCF, 1.2, myId, myPriority) then break end
 
-            -- 4. 鎖定位置
+            -------------------------------------------------------------
+            -- 🥚 情況一：只有偵測到 Cherub Egg 時，執行 A ➔ B ➔ 蛋 ➔ B ➔ A 路線
+            -------------------------------------------------------------
+            if egg.Name == "Cherub Egg" then
+                print("🥚 偵測到 Cherub Egg！啟動 Cherub 專用漂移路線...")
+                
+                -- 1. 漂移至地點 A
+                if not driftTo(POS_A, 2.5, myId, myPriority) then break end
+                if not smartWait(0.1, myId, myPriority) then break end
+
+                -- 2. 漂移至地點 B
+                if not driftTo(POS_B, 2.0, myId, myPriority) then break end
+                if not smartWait(0.1, myId, myPriority) then break end
+
+                -- 3. 漂移前往蛋的位置
+                if not driftTo(targetEggCF, 1.2, myId, myPriority) then break end
+
+            -------------------------------------------------------------
+            -- 🥚 情況二：其他一般蛋，直接傳送過去
+            -------------------------------------------------------------
+            else
+                print("🥚 偵測到 " .. egg.Name .. "，執行直接傳送...")
+                if not teleportTo(eggPos, myId, myPriority, false) then break end
+            end
+
+            -- 4. 鎖定位置準備拿蛋
             local lockConn
             lockConn = RunService.Heartbeat:Connect(function()
                 if enabled and not isPaused and runId == myId and taskPriority == myPriority then
@@ -651,15 +641,19 @@ local function startLoop()
 
             if not enabled or runId ~= myId or taskPriority ~= myPriority then break end
 
-            -- 🚀 7. 拿完蛋後，從蛋的位置漂移回到地點 B
-            if not driftTo(POS_B, 1.2, myId, myPriority) then break end
-            if not smartWait(0.1, myId, myPriority) then break end
+            -------------------------------------------------------------
+            -- 🥚 拿完蛋後的返程路線
+            -------------------------------------------------------------
+            if egg.Name == "Cherub Egg" then
+                -- 7. Cherub Egg 專用返程：回點 B ➔ 回點 A
+                if not driftTo(POS_B, 1.2, myId, myPriority) then break end
+                if not smartWait(0.1, myId, myPriority) then break end
 
-            -- 🚀 8. 從地點 B 漂移回到地點 A
-            if not driftTo(POS_A, 2.0, myId, myPriority) then break end
-            if not smartWait(0.1, myId, myPriority) then break end
+                if not driftTo(POS_A, 2.0, myId, myPriority) then break end
+                if not smartWait(0.1, myId, myPriority) then break end
+            end
 
-            -- 🚀 9. 返回基地 (原點)
+            -- 8. 最後返回基地 (原點)
             if savedOriginCFrame then
                 returnToBase(savedOriginCFrame, myId, myPriority, false)
             end
@@ -674,7 +668,6 @@ end
 
 -- ===== UI 狀態刷新控制 =====
 
--- 徹底停止邏輯
 local function stopLogic()
     enabled = false
     isPaused = false
@@ -685,7 +678,6 @@ local function stopLogic()
     stopMovement()
     resetBtnStyles()
 
-    -- 按鈕樣式：已停止狀態
     StartStopBtn.Text = "▶ 啟動腳本"
     StartStopBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 80)
 
@@ -694,13 +686,11 @@ local function stopLogic()
     PauseBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
 end
 
--- 啟動腳本邏輯
 local function startLogic()
     stopLogic()
     enabled = true
     isPaused = false
 
-    -- 按鈕樣式：運行中狀態
     StartStopBtn.Text = "⏹ 停止腳本"
     StartStopBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
 
@@ -713,19 +703,12 @@ end
 
 -- ===== 按鈕事件綁定 =====
 
--- 啟動 / 停止 主按鈕
 StartStopBtn.MouseButton1Click:Connect(function()
-    if enabled then
-        stopLogic()
-    else
-        startLogic()
-    end
+    if enabled then stopLogic() else startLogic() end
 end)
 
--- 暫停 / 繼續 按鈕
 PauseBtn.MouseButton1Click:Connect(function()
-    if not enabled then return end -- 沒啟動時無法暫停
-
+    if not enabled then return end
     isPaused = not isPaused
     if isPaused then
         PauseBtn.Text = "▶ 繼續"
@@ -738,7 +721,6 @@ PauseBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- 右上角 重設自訂原點 按鈕 ⚙
 SetHomeBtn.MouseButton1Click:Connect(function()
     local _, _, root = getChar()
     if root then
@@ -752,7 +734,6 @@ SetHomeBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- 手動點擊「🏠 飄回記錄原點」按鈕
 ReturnBtn.MouseButton1Click:Connect(function()
     if enabled then stopLogic() end
 
@@ -776,7 +757,6 @@ ReturnBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- 手動點擊「⚡ 瞬移至指定座標」按鈕
 TpCustomBtn.MouseButton1Click:Connect(function()
     if enabled then stopLogic() end
 
@@ -795,7 +775,6 @@ TpCustomBtn.MouseButton1Click:Connect(function()
     end)
 end)
 
--- 手動點擊「🌀 傳送回遊戲原點」按鈕
 TpSpawnBtn.MouseButton1Click:Connect(function()
     if enabled then stopLogic() end
 
@@ -815,7 +794,6 @@ TpSpawnBtn.MouseButton1Click:Connect(function()
     end)
 end)
 
--- 右上角 關閉程式 (叉叉) 按鈕
 CloseBtn.MouseButton1Click:Connect(function()
     stopLogic()
     ScreenGui:Destroy()
