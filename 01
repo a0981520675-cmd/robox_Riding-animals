@@ -742,7 +742,6 @@ TpSpawnBtn.MouseButton1Click:Connect(function()
 
     task.spawn(function()
         local spawnCF = getGameSpawnCFrame()
-        -- 修正這裡：改用 runId 取代原本會報錯的 nil 變數 myId
         teleportTo(spawnCF.Position, runId, myPriority, true)
         if taskPriority == myPriority then
             resetBtnStyles()
