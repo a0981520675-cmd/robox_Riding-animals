@@ -12,12 +12,6 @@ local targets = {
     ["Volcanic Egg"]  = true
 }
 
--- ⚖️ 重量過濾設定 (單位：kg)
-local WEIGHT_LIMITS = {
-    ["Blackhole Egg"] = 500000, -- 超過 500K kg 才拿
-    ["Solaris Egg"]   = 50000   -- 超過 50K kg 才拿
-}
-
 local player = Players.LocalPlayer
 local enabled = false
 local isPaused = false
@@ -137,7 +131,7 @@ CloseBtn.Text = "✕"
 CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 CloseBtn.TextSize = 12
 CloseBtn.Font = Enum.Font.GothamBold
-CloseBtn.Parent = CloseBtn.Parent and ControlBox
+CloseBtn.Parent = ControlBox
 
 local CloseCorner = Instance.new("UICorner")
 CloseCorner.CornerRadius = UDim.new(0, 4)
@@ -449,28 +443,7 @@ local function interactPrompt(prompt)
     end)
 end
 
--- ⚖️ 讀取蛋重量的輔助函數
-local function getEggWeight(egg)
-    -- 1. 嘗試抓取 Attribute 屬性
-    local weightAttr = egg:GetAttribute("Weight") or egg:GetAttribute("weight") or egg:GetAttribute("Kg")
-    if weightAttr then return tonumber(weightAttr) or 0 end
-
-    -- 2. 嘗試從名稱中解析數字 (例如 "Blackhole Egg 600000kg" 或 "500k")
-    local name = egg.Name
-    local numStr = name:match("(%d+%.?%d*)[kK]")
-    if numStr then
-        return (tonumber(numStr) or 0) * 1000
-    end
-
-    local rawNum = name:match("(%d+%.?%d*)")
-    if rawNum then
-        return tonumber(rawNum) or 0
-    end
-
-    return 0
-end
-
--- 🔍 尋找最近且符合門檻條件的蛋
+-- 🔍 尋找最近的目標蛋
 local function findNearestEgg(root)
     local folder = Workspace:FindFirstChild("RenderedEggs")
     if not folder then return end
@@ -480,17 +453,6 @@ local function findNearestEgg(root)
 
     for _, egg in ipairs(folder:GetChildren()) do
         if targets[egg.Name] and not (blacklist[egg] and blacklist[egg] > now) then
-            
-            -- ⚖️ 重量判斷檢查
-            local requiredWeight = WEIGHT_LIMITS[egg.Name]
-            if requiredWeight then
-                local actualWeight = getEggWeight(egg)
-                if actualWeight < requiredWeight then
-                    -- 重量未達門檻，跳過這顆蛋
-                    continue
-                end
-            end
-
             local ok, pivot = pcall(function() return egg:GetPivot() end)
             if ok and pivot then
                 local d = (pivot.Position - root.Position).Magnitude
@@ -600,7 +562,7 @@ local function startLoop()
 
             savedOriginCFrame = savedOriginCFrame or root.CFrame
 
-            -- 1. 搜尋符合條件的蛋
+            -- 1. 搜尋附近的蛋
             local egg, eggPos = findNearestEgg(root)
             if not egg then
                 if not smartWait(0.3, myId, myPriority) then break end
@@ -614,10 +576,10 @@ local function startLoop()
             local currentEggName = tostring(egg.Name)
             local targetEggCF = CFrame.new(eggPos + TP_OFFSET)
 
-            print("[EggCollector] 發現符合條件的蛋: " .. currentEggName)
+            print("[EggCollector] 開始採集蛋類: " .. currentEggName)
 
             --------------------------------------------------------------------
-            -- 🔴 分流 1：特例走 A ➔ B 路線的蛋改為【Volcanic Egg】
+            -- 🔴 分流 1：特例走 A ➔ B 路線的蛋【Volcanic Egg】
             --------------------------------------------------------------------
             if currentEggName == "Volcanic Egg" then
                 print("==========================================")
