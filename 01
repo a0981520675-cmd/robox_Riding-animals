@@ -21,7 +21,7 @@ local taskPriority = 0
 local blacklist = {}
 local activeConnections = {}
 
--- 🏠 自動動態基地座標（每次進遊戲會自動抓取，或手動點按鈕設定）
+-- 🏠 自動動態基地座標
 local dynamicBaseCFrame = nil
 
 -- 📍 Volcanic Egg 專用 A、B 中轉座標
@@ -54,7 +54,7 @@ local HOLD_TIMEOUT = 2                     -- 最多停留幾秒等蛋被拿走
 local RETRY_INTERVAL = 0.15                -- 快速連點 Prompt 的間隔
 local PICKUP_WAIT = 0.2                    -- 拿到蛋後準備出發
 local RETURN_SPEED = 220                   -- 回基地移動速度
-local HOME_HOLD = 0.5                      -- 到基地後停留鎖定並點擊「放下」按鈕的秒數
+local HOME_HOLD = 1.0                      -- 到基地後停留並等待動態「放下」按鈕出現的秒數
 local LOOP_DELAY = 0.1                     -- 每輪間隔
 -- ======================================
 
@@ -71,7 +71,7 @@ ScreenGui.Parent = parentGui
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 220, 0, 270) -- 調整高度以容納按鈕
+MainFrame.Size = UDim2.new(0, 220, 0, 270)
 MainFrame.Position = UDim2.new(0.05, 0, 0.35, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 32, 38)
 MainFrame.BorderSizePixel = 0
@@ -185,7 +185,7 @@ local ReturnCorner = Instance.new("UICorner")
 ReturnCorner.CornerRadius = UDim.new(0, 6)
 ReturnCorner.Parent = ReturnBtn
 
--- ⚡ 快速傳送到世界原點按鈕
+-- 🌀 快速傳送到世界原點按鈕
 local TpSpawnBtn = Instance.new("TextButton")
 TpSpawnBtn.Name = "TpSpawnBtn"
 TpSpawnBtn.Size = UDim2.new(1, -20, 0, 36)
@@ -441,19 +441,23 @@ local function interactPrompt(prompt)
     end)
 end
 
--- 🔍 自動掃描並點擊畫面上寫著「放下」的按鈕
-local function clickDropButton()
+-- 🔍 動態偵測並點擊「放下」按鈕（支援先移動鼠標再點擊）
+local function clickDynamicDropButton()
     pcall(function()
         local playerGui = player:FindFirstChild("PlayerGui")
         if not playerGui then return end
 
         for _, gui in ipairs(playerGui:GetDescendants()) do
-            if gui:IsA("TextButton") and (gui.Text == "放下" or string.find(gui.Text, "放")) then
+            if gui:IsA("TextButton") and (gui.Text == "放下" or string.find(gui.Text, "放")) and gui.Visible then
                 local pos = gui.AbsolutePosition + (gui.AbsoluteSize / 2)
-                VirtualInputManager:SendMouseButtonEvent(pos.X, pos.Y, 0, true, game, 1)
+                -- 1. 先移動滑鼠游標到按鈕位置 (模擬真實懸停)
+                VirtualInputManager:SendMouseMoveEvent(pos.X, pos.Y, game)
                 task.wait(0.05)
+                -- 2. 模擬滑鼠按下並放開
+                VirtualInputManager:SendMouseButtonEvent(pos.X, pos.Y, 0, true, game, 1)
+                task.wait(0.08)
                 VirtualInputManager:SendMouseButtonEvent(pos.X, pos.Y, 0, false, game, 1)
-                print("[AutoDrop] 已自動點擊「放下」按鈕！")
+                print("[AutoDrop] 動態偵測並成功點擊「放下」按鈕！")
             end
         end
     end)
@@ -549,9 +553,9 @@ local function returnToBase(originCFrame, myId, myPriority, isManual)
     while (isManual or (enabled and runId == myId)) and (myPriority == nil or taskPriority == myPriority) and (os.clock() - t0 < HOME_HOLD) do
         while isPaused do task.wait(0.05) end
         setTargetCFrame(originCFrame)
-        -- 🎯 一到基地就自動點擊「放下」按鈕
-        clickDropButton()
-        task.wait(0.1)
+        -- 🎯 一到基地（此時蛋在頭上、動態按鈕已出現），持續掃描並點擊「放下」
+        clickDynamicDropButton()
+        task.wait(0.15)
     end
 end
 
@@ -692,18 +696,11 @@ local function startLoop()
             end
 
             --------------------------------------------------------------------
-            -- 🌀 重點流程：拿完蛋後 ➔ 傳送到世界原點 ➔ 平滑飄回自動偵測的基地 ➔ 自動點擊放下
+            -- 🌀 重點流程：拿完蛋後 ➔ 飄回基地 ➔ 動態偵測並點擊「放下」按鈕
             --------------------------------------------------------------------
             if enabled and runId == myId and taskPriority == myPriority then
-                -- 步驟 1：傳送到世界原點（讓蛋舉在頭上）
-                print("[Spawn] 傳送至世界原點...")
-                local spawnCF = getGameSpawnCFrame()
-                teleportTo(spawnCF.Position, myId, myPriority, false)
-                smartWait(0.4, myId, myPriority)
-
-                -- 步驟 2：平滑飄回動態偵測的基地
                 if dynamicBaseCFrame then
-                    print("[ReturnHome] 飄回基地...")
+                    print("[ReturnHome] 飄回基地，準備動態點擊「放下」...")
                     returnToBase(dynamicBaseCFrame, myId, myPriority, false)
                 end
             end
@@ -821,7 +818,7 @@ TpSpawnBtn.MouseButton1Click:Connect(function()
 
     task.spawn(function()
         local spawnCF = getGameSpawnCFrame()
-        teleportTo(spawnCF.Position, runId, myPriority, true)
+        teleportTo(spawnCF.Position, myId, myPriority, true)
         if taskPriority == myPriority then
             resetBtnStyles()
         end
