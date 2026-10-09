@@ -52,7 +52,7 @@ local SYNC_WAIT = 0.28                     -- 移動後等待伺服器同步
 local HOLD_TIMEOUT = 3                     -- 最多停留幾秒等蛋被拿走
 local RETRY_INTERVAL = 0.3                 -- 重複觸發 Prompt 的間隔
 local PICKUP_WAIT = 0.6                    -- 拿到蛋後等待多久才出發
-local RETURN_SPEED = 275                   -- 回基地速度
+local RETURN_SPEED = 225                   -- 回基地速度
 local HOME_HOLD = 0.5                      -- 到基地後停留鎖定幾秒
 local LOOP_DELAY = 0.3                     -- 每輪間隔
 -- ======================================
