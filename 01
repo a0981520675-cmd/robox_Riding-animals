@@ -44,18 +44,18 @@ local function getGameSpawnCFrame()
     return CFrame.new(DEFAULT_SPAWN_POS)
 end
 
--- ===== 極速參數設定 =====
+-- ===== 參數微調設定 =====
 local BLACKLIST_TIME = 15                 -- 失敗的蛋暫時跳過幾秒
 local TP_OFFSET = Vector3.new(0, 4, 0)     -- 高度偏移
-local STEP_DIST = 150                      -- 分段移動每段距離 (超大幅提高移動速度)
-local SYNC_WAIT = 0.1                      -- 移動後等待伺服器同步極短延遲
+local STEP_DIST = 150                      -- 分段移動每段距離
+local SYNC_WAIT = 0.1                      -- 移動後等待伺服器同步
 local HOLD_TIMEOUT = 2                     -- 最多停留幾秒等蛋被拿走
 local RETRY_INTERVAL = 0.15                -- 快速連點 Prompt 的間隔
-local PICKUP_WAIT = 0.2                    -- 拿到蛋後極速準備出發
-local RETURN_SPEED = 600                   -- ⚡ 飄回基地極速 (調高至 600)
-local DROP_REPICK_WAIT = 0.3               -- 放下與再撿起之間的極短間隔
+local PICKUP_WAIT = 0.2                    -- 拿到蛋後準備出發
+local RETURN_SPEED = 220                   -- ⚡ 回基地移動速度（調降至 220，讓過程平穩不飛天）
+local DROP_REPICK_WAIT = 0.4               -- 放下與再撿起之間的等待秒數
 local HOME_HOLD = 0.3                      -- 到基地後停留鎖定秒數
-local LOOP_DELAY = 0.1                     -- 每輪間隔極短
+local LOOP_DELAY = 0.1                     -- 每輪間隔
 -- ======================================
 
 -- 清理舊 UI
@@ -404,21 +404,15 @@ local function interactPrompt(prompt)
     end)
 end
 
--- 觸發周圍所有 ProximityPrompt (用於放下與再撿起蛋)
-local function triggerNearbyPrompts()
-    local char, hum, root = getChar()
-    if not root then return end
-
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("ProximityPrompt") and obj.Enabled then
-            local parentPart = obj.Parent
-            if parentPart and parentPart:IsA("BasePart") then
-                if (parentPart.Position - root.Position).Magnitude <= (obj.MaxActivationDistance or 15) then
-                    interactPrompt(obj)
-                end
+-- 強力觸發周圍所有 Prompt（包含全 Workspace 搜尋以確保放蛋成功）
+local function triggerAllPrompts()
+    pcall(function()
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            if obj:IsA("ProximityPrompt") and obj.Enabled then
+                interactPrompt(obj)
             end
         end
-    end
+    end)
 end
 
 -- 🔍 尋找最近的目標蛋
@@ -443,7 +437,7 @@ local function findNearestEgg(root)
     return best, bestPos
 end
 
--- 平滑返回基地 (SPEED = 600)
+-- 平滑返回基地 (SPEED = 220)
 local function returnToBase(originCFrame, myId, myPriority, isManual)
     local done = false
     local lastTime = os.clock()
@@ -643,26 +637,26 @@ local function startLoop()
             end
 
             --------------------------------------------------------------------
-            -- 🌀 重點流程：先傳送到世界原點 ➔ 放下蛋 ➔ 再撿起來 ➔ 走回基地
+            -- 🌀 重點流程：先傳送到世界原點 ➔ 強力放下蛋 ➔ 再撿起來 ➔ 平穩飄回基地
             --------------------------------------------------------------------
             if enabled and runId == myId and taskPriority == myPriority then
                 -- 步驟 1：極速傳送至世界原點 (Spawn)
-                print("[DropEgg] 極速傳送至世界原點...")
+                print("[DropEgg] 傳送至世界原點...")
                 local spawnCF = getGameSpawnCFrame()
                 teleportTo(spawnCF.Position, myId, myPriority, false)
                 
-                -- 步驟 2：在世界原點觸發放下蛋
-                print("[DropEgg] 觸發放下蛋...")
-                triggerNearbyPrompts()
+                -- 步驟 2：強制觸發周圍所有互動按鈕（放下蛋）
+                print("[DropEgg] 強力觸發放下蛋...")
+                triggerAllPrompts()
                 smartWait(DROP_REPICK_WAIT, myId, myPriority)
 
-                -- 步驟 3：在世界原點再次觸發撿起蛋
-                print("[RePickEgg] 在世界原點重新撿起蛋...")
-                triggerNearbyPrompts()
+                -- 步驟 3：再次強力觸發（重新撿起蛋）
+                print("[RePickEgg] 再次觸發撿起蛋...")
+                triggerAllPrompts()
                 smartWait(DROP_REPICK_WAIT, myId, myPriority)
 
-                -- 步驟 4：平滑走回固定基地座標 (CFrame.new(6.9, 40330.0, 866.2))
-                print("[ReturnHome] 走回指定基地座標...")
+                -- 步驟 4：平穩飄回基地座標 (CFrame.new(6.9, 40330.0, 866.2))
+                print("[ReturnHome] 平穩飄回基地...")
                 returnToBase(BASE_CFRAME, myId, myPriority, false)
             end
 
