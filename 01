@@ -63,7 +63,7 @@ local parentGui = player:FindFirstChild("PlayerGui") or CoreGui
 local old = parentGui:FindFirstChild("AutoEggPathGui")
 if old then old:Destroy() end
 
--- ===== UI 建立 (調整高度以容納新按鈕) =====
+-- ===== UI 建立 (再加高以容納 A、B 按鈕) =====
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "AutoEggPathGui"
 ScreenGui.ResetOnSpawn = false
@@ -71,7 +71,7 @@ ScreenGui.Parent = parentGui
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 220, 0, 314) -- 稍微加高以容納新按鈕
+MainFrame.Size = UDim2.new(0, 220, 0, 396) -- 調整高度容納更多按鈕
 MainFrame.Position = UDim2.new(0.05, 0, 0.35, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 32, 38)
 MainFrame.BorderSizePixel = 0
@@ -201,7 +201,7 @@ local TpSpawnCorner = Instance.new("UICorner")
 TpSpawnCorner.CornerRadius = UDim.new(0, 6)
 TpSpawnCorner.Parent = TpSpawnBtn
 
--- 🎯 【新增】回到世界中心點按鈕
+-- 🎯 回到世界中心點按鈕
 local CenterBtn = Instance.new("TextButton")
 CenterBtn.Name = "CenterBtn"
 CenterBtn.Size = UDim2.new(1, -20, 0, 36)
@@ -217,11 +217,43 @@ local CenterCorner = Instance.new("UICorner")
 CenterCorner.CornerRadius = UDim.new(0, 6)
 CenterCorner.Parent = CenterBtn
 
+-- 📍 【新增】傳送到 A 點按鈕
+local TpABtn = Instance.new("TextButton")
+TpABtn.Name = "TpABtn"
+TpABtn.Size = UDim2.new(1, -20, 0, 36)
+TpABtn.Position = UDim2.new(0, 10, 0, 214)
+TpABtn.BackgroundColor3 = Color3.fromRGB(180, 90, 30)
+TpABtn.Text = "📍 傳送到 A 點"
+TpABtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+TpABtn.TextSize = 13
+TpABtn.Font = Enum.Font.GothamBold
+TpABtn.Parent = MainFrame
+
+local TpACorner = Instance.new("UICorner")
+TpACorner.CornerRadius = UDim.new(0, 6)
+TpACorner.Parent = TpABtn
+
+-- 📍 【新增】傳送到 B 點按鈕
+local TpBBtn = Instance.new("TextButton")
+TpBBtn.Name = "TpBBtn"
+TpBBtn.Size = UDim2.new(1, -20, 0, 36)
+TpBBtn.Position = UDim2.new(0, 10, 0, 256)
+TpBBtn.BackgroundColor3 = Color3.fromRGB(180, 120, 30)
+TpBBtn.Text = "📍 傳送到 B 點"
+TpBBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+TpBBtn.TextSize = 13
+TpBBtn.Font = Enum.Font.GothamBold
+TpBBtn.Parent = MainFrame
+
+local TpBCorner = Instance.new("UICorner")
+TpBCorner.CornerRadius = UDim.new(0, 6)
+TpBCorner.Parent = TpBBtn
+
 -- ⚡ 瞬移至指定座標按鈕
 local TpCustomBtn = Instance.new("TextButton")
 TpCustomBtn.Name = "TpCustomBtn"
 TpCustomBtn.Size = UDim2.new(1, -20, 0, 36)
-TpCustomBtn.Position = UDim2.new(0, 10, 0, 214)
+TpCustomBtn.Position = UDim2.new(0, 10, 0, 298)
 TpCustomBtn.BackgroundColor3 = Color3.fromRGB(130, 60, 200)
 TpCustomBtn.Text = "⚡ 瞬移至指定座標"
 TpCustomBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -278,6 +310,12 @@ local function resetBtnStyles()
 
     CenterBtn.Text = "🎯 回到世界中心點"
     CenterBtn.BackgroundColor3 = Color3.fromRGB(40, 160, 100)
+
+    TpABtn.Text = "📍 傳送到 A 點"
+    TpABtn.BackgroundColor3 = Color3.fromRGB(180, 90, 30)
+
+    TpBBtn.Text = "📍 傳送到 B 點"
+    TpBBtn.BackgroundColor3 = Color3.fromRGB(180, 120, 30)
 
     TpCustomBtn.Text = "⚡ 瞬移至指定座標"
     TpCustomBtn.BackgroundColor3 = Color3.fromRGB(130, 60, 200)
@@ -836,7 +874,7 @@ TpSpawnBtn.MouseButton1Click:Connect(function()
     end)
 end)
 
--- 🎯 【新增】回到世界中心點按鈕 (直接傳送到世界原點/中心點座標 Vector3.new(0, 50, 0))
+-- 🎯 回到世界中心點按鈕
 CenterBtn.MouseButton1Click:Connect(function()
     if enabled then stopLogic() end
 
@@ -849,6 +887,44 @@ CenterBtn.MouseButton1Click:Connect(function()
 
     task.spawn(function()
         teleportTo(DEFAULT_SPAWN_POS, runId, myPriority, true)
+        if taskPriority == myPriority then
+            resetBtnStyles()
+        end
+    end)
+end)
+
+-- 📍 【新增】傳送到 A 點按鈕
+TpABtn.MouseButton1Click:Connect(function()
+    if enabled then stopLogic() end
+
+    taskPriority += 1
+    local myPriority = taskPriority
+
+    resetBtnStyles()
+    TpABtn.Text = "📍 傳送 A 點中..."
+    TpABtn.BackgroundColor3 = Color3.fromRGB(200, 140, 40)
+
+    task.spawn(function()
+        teleportTo(POS_A.Position, runId, myPriority, true)
+        if taskPriority == myPriority then
+            resetBtnStyles()
+        end
+    end)
+end)
+
+-- 📍 【新增】傳送到 B 點按鈕
+TpBBtn.MouseButton1Click:Connect(function()
+    if enabled then stopLogic() end
+
+    taskPriority += 1
+    local myPriority = taskPriority
+
+    resetBtnStyles()
+    TpBBtn.Text = "📍 傳送 B 點中..."
+    TpBBtn.BackgroundColor3 = Color3.fromRGB(200, 140, 40)
+
+    task.spawn(function()
+        teleportTo(POS_B.Position, runId, myPriority, true)
         if taskPriority == myPriority then
             resetBtnStyles()
         end
@@ -874,7 +950,8 @@ TpCustomBtn.MouseButton1Click:Connect(function()
     end)
 end)
 
-CloseBtn.MouseButton1Click:Connect(function(	)
+CloseBtn.MouseButton1Click:Connect(function()
     stopLogic()
     ScreenGui:Destroy()
 end)
+```[cite: 1]
