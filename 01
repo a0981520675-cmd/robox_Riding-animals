@@ -434,18 +434,12 @@ local function teleportTo(pos, myId, myPriority, ignoreState)
     return false
 end
 
--- 🛡️ 安全的互動提示觸發（防止 nil 報錯）
+-- 🛠️ 使用你原本最穩定、絕對不報錯的 ProximityPrompt 觸發方式
 local function interactPrompt(prompt)
     pcall(function()
-        if prompt and prompt:IsA("ProximityPrompt") then
-            if type(fireproximityprompt) == "function" then
-                fireproximityprompt(prompt)
-            else
-                prompt:InputHoldBegin()
-                task.wait(prompt.HoldDuration or 0)
-                prompt:InputHoldEnd()
-            end
-        end
+        prompt:InputHoldBegin()
+        task.wait(prompt.HoldDuration or 0)
+        prompt:InputHoldEnd()
     end)
 end
 
