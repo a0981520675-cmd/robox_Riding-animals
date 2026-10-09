@@ -21,8 +21,8 @@ local taskPriority = 0
 local blacklist = {}
 local activeConnections = {}
 
--- 🏠 指定基地固定座標
-local BASE_CFRAME = CFrame.new(6.9, 40330.0, 866.2)
+-- 🏠 自動動態基地座標（每次進遊戲會自動抓取，或手動點按鈕設定）
+local dynamicBaseCFrame = nil
 
 -- 📍 Volcanic Egg 專用 A、B 中轉座標
 local POS_A = CFrame.new(-4888.9, 41278.3, -3735.4) -- 地點 A
@@ -30,6 +30,20 @@ local POS_B = CFrame.new(-4972.4, 41285.8, -3645.5) -- 地點 B
 
 -- 指定瞬移座標
 local customTargetPos = Vector3.new(-5072, 41405, -3447)
+
+-- ===== 遊戲預設出生點 (世界原點) =====
+local DEFAULT_SPAWN_POS = Vector3.new(0, 50, 0)
+
+local function getGameSpawnCFrame()
+    local spawnObj = Workspace:FindFirstChildOfClass("SpawnLocation") 
+        or Workspace:FindFirstChild("SpawnLocation", true)
+        or Workspace:FindFirstChild("Spawn", true)
+    
+    if spawnObj and spawnObj:IsA("BasePart") then
+        return spawnObj.CFrame + Vector3.new(0, 4, 0)
+    end
+    return CFrame.new(DEFAULT_SPAWN_POS)
+end
 
 -- ===== 參數設定 =====
 local BLACKLIST_TIME = 15                 -- 失敗的蛋暫時跳過幾秒
@@ -57,7 +71,7 @@ ScreenGui.Parent = parentGui
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 220, 0, 220)
+MainFrame.Size = UDim2.new(0, 220, 0, 270) -- 調整高度以容納按鈕
 MainFrame.Position = UDim2.new(0.05, 0, 0.35, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 32, 38)
 MainFrame.BorderSizePixel = 0
@@ -77,7 +91,7 @@ TopBar.Parent = MainFrame
 
 local TitleLabel = Instance.new("TextLabel")
 TitleLabel.Name = "Title"
-TitleLabel.Size = UDim2.new(1, -40, 1, 0)
+TitleLabel.Size = UDim2.new(1, -70, 1, 0)
 TitleLabel.Position = UDim2.new(0, 10, 0, 0)
 TitleLabel.BackgroundTransparency = 1
 TitleLabel.Text = "Auto Egg Collector"
@@ -86,6 +100,22 @@ TitleLabel.TextSize = 13
 TitleLabel.Font = Enum.Font.GothamBold
 TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
 TitleLabel.Parent = TopBar
+
+-- ⚙ 設定基地按鈕
+local SetHomeBtn = Instance.new("TextButton")
+SetHomeBtn.Name = "SetHomeBtn"
+SetHomeBtn.Size = UDim2.new(0, 24, 0, 24)
+SetHomeBtn.Position = UDim2.new(1, -56, 0.5, -12)
+SetHomeBtn.BackgroundColor3 = Color3.fromRGB(45, 48, 56)
+SetHomeBtn.Text = "⚙"
+SetHomeBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+SetHomeBtn.TextSize = 12
+SetHomeBtn.Font = Enum.Font.GothamBold
+SetHomeBtn.Parent = TopBar
+
+local SetHomeCorner = Instance.new("UICorner")
+SetHomeCorner.CornerRadius = UDim.new(0, 4)
+SetHomeCorner.Parent = SetHomeBtn
 
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Name = "CloseBtn"
@@ -139,14 +169,15 @@ local PauseCorner = Instance.new("UICorner")
 PauseCorner.CornerRadius = UDim.new(0, 6)
 PauseCorner.Parent = PauseBtn
 
+-- 🏠 慢速飄回基地按鈕
 local ReturnBtn = Instance.new("TextButton")
 ReturnBtn.Name = "ReturnBtn"
-ReturnBtn.Size = UDim2.new(1, -20, 0, 40)
+ReturnBtn.Size = UDim2.new(1, -20, 0, 36)
 ReturnBtn.Position = UDim2.new(0, 10, 0, 88)
 ReturnBtn.BackgroundColor3 = Color3.fromRGB(45, 110, 200)
 ReturnBtn.Text = "🏠 飄回基地"
 ReturnBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-ReturnBtn.TextSize = 14
+ReturnBtn.TextSize = 13
 ReturnBtn.Font = Enum.Font.GothamBold
 ReturnBtn.Parent = MainFrame
 
@@ -154,14 +185,31 @@ local ReturnCorner = Instance.new("UICorner")
 ReturnCorner.CornerRadius = UDim.new(0, 6)
 ReturnCorner.Parent = ReturnBtn
 
+-- ⚡ 快速傳送到世界原點按鈕
+local TpSpawnBtn = Instance.new("TextButton")
+TpSpawnBtn.Name = "TpSpawnBtn"
+TpSpawnBtn.Size = UDim2.new(1, -20, 0, 36)
+TpSpawnBtn.Position = UDim2.new(0, 10, 0, 130)
+TpSpawnBtn.BackgroundColor3 = Color3.fromRGB(30, 140, 140)
+TpSpawnBtn.Text = "🌀 傳送到世界原點"
+TpSpawnBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+TpSpawnBtn.TextSize = 13
+TpSpawnBtn.Font = Enum.Font.GothamBold
+TpSpawnBtn.Parent = MainFrame
+
+local TpSpawnCorner = Instance.new("UICorner")
+TpSpawnCorner.CornerRadius = UDim.new(0, 6)
+TpSpawnCorner.Parent = TpSpawnBtn
+
+-- ⚡ 瞬移至指定座標按鈕
 local TpCustomBtn = Instance.new("TextButton")
 TpCustomBtn.Name = "TpCustomBtn"
-TpCustomBtn.Size = UDim2.new(1, -20, 0, 40)
-TpCustomBtn.Position = UDim2.new(0, 10, 0, 136)
+TpCustomBtn.Size = UDim2.new(1, -20, 0, 36)
+TpCustomBtn.Position = UDim2.new(0, 10, 0, 172)
 TpCustomBtn.BackgroundColor3 = Color3.fromRGB(130, 60, 200)
 TpCustomBtn.Text = "⚡ 瞬移至指定座標"
 TpCustomBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-TpCustomBtn.TextSize = 14
+TpCustomBtn.TextSize = 13
 TpCustomBtn.Font = Enum.Font.GothamBold
 TpCustomBtn.Parent = MainFrame
 
@@ -208,6 +256,9 @@ end)
 local function resetBtnStyles()
     ReturnBtn.Text = "🏠 飄回基地"
     ReturnBtn.BackgroundColor3 = Color3.fromRGB(45, 110, 200)
+
+    TpSpawnBtn.Text = "🌀 傳送到世界原點"
+    TpSpawnBtn.BackgroundColor3 = Color3.fromRGB(30, 140, 140)
 
     TpCustomBtn.Text = "⚡ 瞬移至指定座標"
     TpCustomBtn.BackgroundColor3 = Color3.fromRGB(130, 60, 200)
@@ -511,6 +562,13 @@ local function startLoop()
     local myPriority = taskPriority
 
     task.spawn(function()
+        -- 🎯 啟動時自動抓取當前站立位置作為基地
+        local _, _, root0 = getChar()
+        if root0 and not dynamicBaseCFrame then
+            dynamicBaseCFrame = root0.CFrame
+            print("[AutoBase] 已自動記錄當前位置為基地座標！")
+        end
+
         while enabled and runId == myId and taskPriority == myPriority do
             while isPaused and enabled and runId == myId and taskPriority == myPriority do
                 task.wait(0.05)
@@ -521,6 +579,8 @@ local function startLoop()
                 if not smartWait(0.3, myId, myPriority) then break end
                 continue
             end
+
+            dynamicBaseCFrame = dynamicBaseCFrame or root.CFrame
 
             -- 1. 搜尋附近的蛋
             local egg, eggPos = findNearestEgg(root)
@@ -632,11 +692,20 @@ local function startLoop()
             end
 
             --------------------------------------------------------------------
-            -- 🌀 重點流程：拿完蛋後 ➔ 直接平滑飄回基地 ➔ 自動點擊「放下」按鈕入背包
+            -- 🌀 重點流程：拿完蛋後 ➔ 傳送到世界原點 ➔ 平滑飄回自動偵測的基地 ➔ 自動點擊放下
             --------------------------------------------------------------------
             if enabled and runId == myId and taskPriority == myPriority then
-                print("[ReturnHome] 飄回基地，準備放下蛋...")
-                returnToBase(BASE_CFRAME, myId, myPriority, false)
+                -- 步驟 1：傳送到世界原點（讓蛋舉在頭上）
+                print("[Spawn] 傳送至世界原點...")
+                local spawnCF = getGameSpawnCFrame()
+                teleportTo(spawnCF.Position, myId, myPriority, false)
+                smartWait(0.4, myId, myPriority)
+
+                -- 步驟 2：平滑飄回動態偵測的基地
+                if dynamicBaseCFrame then
+                    print("[ReturnHome] 飄回基地...")
+                    returnToBase(dynamicBaseCFrame, myId, myPriority, false)
+                end
             end
 
             if not smartWait(LOOP_DELAY, myId, myPriority) then break end
@@ -702,6 +771,20 @@ PauseBtn.MouseButton1Click:Connect(function()
     end
 end)
 
+-- ⚙ 手動設定基地按鈕
+SetHomeBtn.MouseButton1Click:Connect(function()
+    local _, _, root = getChar()
+    if root then
+        dynamicBaseCFrame = root.CFrame
+        SetHomeBtn.Text = "✅"
+        print("[AutoBase] 手動更新基地座標成功！")
+        task.delay(1, function()
+            SetHomeBtn.Text = "⚙"
+        end)
+    end
+end)
+
+-- 🏠 慢慢飄回基地按鈕
 ReturnBtn.MouseButton1Click:Connect(function()
     if enabled then stopLogic() end
 
@@ -709,17 +792,43 @@ ReturnBtn.MouseButton1Click:Connect(function()
     local myPriority = taskPriority
 
     resetBtnStyles()
-    ReturnBtn.Text = "🚀 飄回基地..."
+    ReturnBtn.Text = "🚀 飄回基地中..."
     ReturnBtn.BackgroundColor3 = Color3.fromRGB(200, 140, 40)
 
+    local _, _, root = getChar()
+    local targetBase = dynamicBaseCFrame or (root and root.CFrame)
+
+    if targetBase then
+        task.spawn(function()
+            returnToBase(targetBase, runId, myPriority, true)
+            if taskPriority == myPriority then
+                resetBtnStyles()
+            end
+        end)
+    end
+end)
+
+-- 🌀 快速傳送到世界原點按鈕
+TpSpawnBtn.MouseButton1Click:Connect(function()
+    if enabled then stopLogic() end
+
+    taskPriority += 1
+    local myPriority = taskPriority
+
+    resetBtnStyles()
+    TpSpawnBtn.Text = "🌀 傳送中..."
+    TpSpawnBtn.BackgroundColor3 = Color3.fromRGB(200, 140, 40)
+
     task.spawn(function()
-        returnToBase(BASE_CFRAME, runId, myPriority, true)
+        local spawnCF = getGameSpawnCFrame()
+        teleportTo(spawnCF.Position, runId, myPriority, true)
         if taskPriority == myPriority then
             resetBtnStyles()
         end
     end)
 end)
 
+-- ⚡ 瞬移至指定座標按鈕
 TpCustomBtn.MouseButton1Click:Connect(function()
     if enabled then stopLogic() end
 
