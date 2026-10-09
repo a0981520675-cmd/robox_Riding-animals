@@ -23,10 +23,24 @@ local activeConnections = {}
 -- 🏠 自動動態基地座標
 local dynamicBaseCFrame = nil
 
--- 📍 更新後的座標設定 (POS_A 改為原 EXTRA_POS_1，POS_B 改為原 EXTRA_POS_2)
-local POS_A = CFrame.new(-5072, 41405, -3447)          -- 原 EXTRA_POS_1
-local POS_B = CFrame.new(-5200, 41300, -3500)          -- 原 EXTRA_POS_2
+-- 📍 Volcanic Egg 專用及瞬移的正確座標設定
+local POS_A = CFrame.new(-4923.6, 41274.1, -3723.7)       -- 火山外座標
+local POS_B = CFrame.new(-4975.0, 41285.8, -3642.4)       -- 火山內座標
 local POS_HIGH = CFrame.new(-5083.7, 41435.2, -3463.5)    -- 火山頂座標
+
+-- ===== 遊戲預設出生點 (世界原點) =====
+local DEFAULT_SPAWN_POS = Vector3.new(0, 50, 0)
+
+local function getGameSpawnCFrame()
+    local spawnObj = Workspace:FindFirstChildOfClass("SpawnLocation") 
+        or Workspace:FindFirstChild("SpawnLocation", true)
+        or Workspace:FindFirstChild("Spawn", true)
+    
+    if spawnObj and spawnObj:IsA("BasePart") then
+        return spawnObj.CFrame + Vector3.new(0, 4, 0)
+    end
+    return CFrame.new(DEFAULT_SPAWN_POS)
+end
 
 -- ===== 參數設定 =====
 local BLACKLIST_TIME = 15                 -- 失敗的蛋暫時跳過幾秒
@@ -54,7 +68,7 @@ ScreenGui.Parent = parentGui
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 220, 0, 280)
+MainFrame.Size = UDim2.new(0, 220, 0, 310) -- 調整高度以容納原點按鈕
 MainFrame.Position = UDim2.new(0.05, 0, 0.35, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 32, 38)
 MainFrame.BorderSizePixel = 0
@@ -155,7 +169,7 @@ PauseCorner.Parent = PauseBtn
 -- 🏠 飄回基地按鈕
 local ReturnBtn = Instance.new("TextButton")
 ReturnBtn.Name = "ReturnBtn"
-ReturnBtn.Size = UDim2.new(1, -20, 0, 32)
+ReturnBtn.Size = UDim2.new(1, -20, 0, 30)
 ReturnBtn.Position = UDim2.new(0, 10, 0, 88)
 ReturnBtn.BackgroundColor3 = Color3.fromRGB(45, 110, 200)
 ReturnBtn.Text = "🏠 飄回基地"
@@ -168,13 +182,29 @@ local ReturnCorner = Instance.new("UICorner")
 ReturnCorner.CornerRadius = UDim.new(0, 6)
 ReturnCorner.Parent = ReturnBtn
 
--- 📍 點 1 按鈕 (POS_A)
+-- 🌀 回到遊戲原點按鈕
+local TpSpawnBtn = Instance.new("TextButton")
+TpSpawnBtn.Name = "TpSpawnBtn"
+TpSpawnBtn.Size = UDim2.new(1, -20, 0, 30)
+TpSpawnBtn.Position = UDim2.new(0, 10, 0, 122)
+TpSpawnBtn.BackgroundColor3 = Color3.fromRGB(30, 120, 140)
+TpSpawnBtn.Text = "🌀 回到遊戲原點"
+TpSpawnBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+TpSpawnBtn.TextSize = 13
+TpSpawnBtn.Font = Enum.Font.GothamBold
+TpSpawnBtn.Parent = MainFrame
+
+local TpSpawnCorner = Instance.new("UICorner")
+TpSpawnCorner.CornerRadius = UDim.new(0, 6)
+TpSpawnCorner.Parent = TpSpawnBtn
+
+-- 🌋 火山外座標按鈕
 local TpABtn = Instance.new("TextButton")
 TpABtn.Name = "TpABtn"
-TpABtn.Size = UDim2.new(1, -20, 0, 32)
-TpABtn.Position = UDim2.new(0, 10, 0, 126)
+TpABtn.Size = UDim2.new(1, -20, 0, 30)
+TpABtn.Position = UDim2.new(0, 10, 0, 156)
 TpABtn.BackgroundColor3 = Color3.fromRGB(130, 60, 200)
-TpABtn.Text = "⚡ 瞬移點 1 (POS_A)"
+TpABtn.Text = "🌋 火山外座標"
 TpABtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 TpABtn.TextSize = 13
 TpABtn.Font = Enum.Font.GothamBold
@@ -184,13 +214,13 @@ local TpACorner = Instance.new("UICorner")
 TpACorner.CornerRadius = UDim.new(0, 6)
 TpACorner.Parent = TpABtn
 
--- 📍 點 2 按鈕 (POS_B)
+-- 🌋 火山內座標按鈕
 local TpBBtn = Instance.new("TextButton")
 TpBBtn.Name = "TpBBtn"
-TpBBtn.Size = UDim2.new(1, -20, 0, 32)
-TpBBtn.Position = UDim2.new(0, 10, 0, 164)
+TpBBtn.Size = UDim2.new(1, -20, 0, 30)
+TpBBtn.Position = UDim2.new(0, 10, 0, 190)
 TpBBtn.BackgroundColor3 = Color3.fromRGB(180, 90, 50)
-TpBBtn.Text = "⚡ 瞬移點 2 (POS_B)"
+TpBBtn.Text = "🌋 火山內座標"
 TpBBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 TpBBtn.TextSize = 13
 TpBBtn.Font = Enum.Font.GothamBold
@@ -200,11 +230,11 @@ local TpBCorner = Instance.new("UICorner")
 TpBCorner.CornerRadius = UDim.new(0, 6)
 TpBCorner.Parent = TpBBtn
 
--- 🌋 火山頂按鈕
+-- 🌋 火山頂座標按鈕
 local TpHighBtn = Instance.new("TextButton")
 TpHighBtn.Name = "TpHighBtn"
-TpHighBtn.Size = UDim2.new(1, -20, 0, 32)
-TpHighBtn.Position = UDim2.new(0, 10, 0, 202)
+TpHighBtn.Size = UDim2.new(1, -20, 0, 30)
+TpHighBtn.Position = UDim2.new(0, 10, 0, 224)
 TpHighBtn.BackgroundColor3 = Color3.fromRGB(30, 140, 140)
 TpHighBtn.Text = "🌋 火山頂座標"
 TpHighBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -256,10 +286,13 @@ local function resetBtnStyles()
     ReturnBtn.Text = "🏠 飄回基地"
     ReturnBtn.BackgroundColor3 = Color3.fromRGB(45, 110, 200)
 
-    TpABtn.Text = "⚡ 瞬移點 1 (POS_A)"
+    TpSpawnBtn.Text = "🌀 回到遊戲原點"
+    TpSpawnBtn.BackgroundColor3 = Color3.fromRGB(30, 120, 140)
+
+    TpABtn.Text = "🌋 火山外座標"
     TpABtn.BackgroundColor3 = Color3.fromRGB(130, 60, 200)
 
-    TpBBtn.Text = "⚡ 瞬移點 2 (POS_B)"
+    TpBBtn.Text = "🌋 火山內座標"
     TpBBtn.BackgroundColor3 = Color3.fromRGB(180, 90, 50)
 
     TpHighBtn.Text = "🌋 火山頂座標"
@@ -580,13 +613,13 @@ local function startLoop()
             print("[EggCollector] 高速採集蛋類: " .. currentEggName)
 
             --------------------------------------------------------------------
-            -- 🔴 分流 1：Volcanic Egg 走專屬 POS_A ➔ POS_B 路線
+            -- 🔴 分流 1：Volcanic Egg 走專屬「火山外 ➔ 火山內」精確路線
             --------------------------------------------------------------------
             if currentEggName == "Volcanic Egg" then
-                print("[Volcanic Route] 觸發 Volcanic Egg 專用 POS_A ➔ POS_B 路線！")
+                print("[Volcanic Route] 觸發 Volcanic Egg 專用 火山外 ➔ 火山內 路線！")
 
-                if not driftTo(POS_A, 0.6, myId, myPriority) then break end
-                if not driftTo(POS_B, 0.4, myId, myPriority) then break end
+                if not driftTo(POS_A, 0.6, myId, myPriority) then break end -- 火山外座標
+                if not driftTo(POS_B, 0.4, myId, myPriority) then break end -- 火山內座標
                 if not driftTo(targetEggCF, 0.3, myId, myPriority) then break end
 
                 local lockConn = RunService.Heartbeat:Connect(function()
@@ -618,8 +651,8 @@ local function startLoop()
                 end
 
                 if enabled and runId == myId and taskPriority == myPriority then
-                    driftTo(POS_B, 0.3, myId, myPriority)
-                    driftTo(POS_A, 0.5, myId, myPriority)
+                    driftTo(POS_B, 0.3, myId, myPriority) -- 回火山內
+                    driftTo(POS_A, 0.5, myId, myPriority) -- 回火山外
                 end
 
             --------------------------------------------------------------------
@@ -769,7 +802,27 @@ ReturnBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- 📍 瞬移點 1 按鈕 (POS_A)
+-- 🌀 回到遊戲原點按鈕
+TpSpawnBtn.MouseButton1Click:Connect(function()
+    if enabled then stopLogic() end
+
+    taskPriority += 1
+    local myPriority = taskPriority
+
+    resetBtnStyles()
+    TpSpawnBtn.Text = "🌀 傳送中..."
+    TpSpawnBtn.BackgroundColor3 = Color3.fromRGB(200, 140, 40)
+
+    task.spawn(function()
+        local spawnCF = getGameSpawnCFrame()
+        teleportTo(spawnCF.Position, myId, myPriority, true)
+        if taskPriority == myPriority then
+            resetBtnStyles()
+        end
+    end)
+end)
+
+-- 🌋 火山外座標按鈕
 TpABtn.MouseButton1Click:Connect(function()
     if enabled then stopLogic() end
 
@@ -777,7 +830,7 @@ TpABtn.MouseButton1Click:Connect(function()
     local myPriority = taskPriority
 
     resetBtnStyles()
-    TpABtn.Text = "⚡ 移動中..."
+    TpABtn.Text = "🌋 移動中..."
     TpABtn.BackgroundColor3 = Color3.fromRGB(200, 140, 40)
 
     task.spawn(function()
@@ -788,7 +841,7 @@ TpABtn.MouseButton1Click:Connect(function()
     end)
 end)
 
--- 📍 瞬移點 2 按鈕 (POS_B)
+-- 🌋 火山內座標按鈕
 TpBBtn.MouseButton1Click:Connect(function()
     if enabled then stopLogic() end
 
@@ -796,7 +849,7 @@ TpBBtn.MouseButton1Click:Connect(function()
     local myPriority = taskPriority
 
     resetBtnStyles()
-    TpBBtn.Text = "⚡ 移動中..."
+    TpBBtn.Text = "🌋 移動中..."
     TpBBtn.BackgroundColor3 = Color3.fromRGB(200, 140, 40)
 
     task.spawn(function()
@@ -807,7 +860,7 @@ TpBBtn.MouseButton1Click:Connect(function()
     end)
 end)
 
--- 🌋 火山頂按鈕
+-- 🌋 火山頂座標按鈕
 TpHighBtn.MouseButton1Click:Connect(function()
     if enabled then stopLogic() end
 
