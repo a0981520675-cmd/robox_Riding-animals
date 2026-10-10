@@ -82,6 +82,8 @@ local RETRY_INTERVAL = 0.3                 -- 重複觸發 Prompt 的間隔
 local PICKUP_WAIT = 0.6                    -- 拿到蛋後等待多久才出發
 local RETURN_SPEED = 280                   -- 回基地速度
 local HOME_HOLD = 0.5                      -- 到基地後停留鎖定幾秒
+local RETURN_SPEED_WALK = 120              -- 沒騎座騎時的回基地速度（比騎乘慢，先試著調低）
+local HOME_HOLD_WALK = 1.5                 -- 沒騎座騎時，到基地後停留鎖定幾秒
 local LOOP_DELAY = 0.3                     -- 每輪間隔
 -- ======================================
 
@@ -378,14 +380,30 @@ local function getMoveTarget()
     return root, char, nil
 end
 
-local function setNoclip(toggle)
-    local targetPart, targetModel = getMoveTarget()
-    if not targetModel then return end
+-- 穿牆時先記下每個零件原本的 CanCollide，結束後原樣還原
+-- （舊版結束時會把全部零件改成 true，可能影響角色身上攜帶的蛋）
+local noclipBackup = {}
 
-    for _, v in ipairs(targetModel:GetDescendants()) do
-        if v:IsA("BasePart") then
-            v.CanCollide = not toggle
+local function setNoclip(toggle)
+    if toggle then
+        local targetPart, targetModel = getMoveTarget()
+        if not targetModel then return end
+
+        for _, v in ipairs(targetModel:GetDescendants()) do
+            if v:IsA("BasePart") then
+                if noclipBackup[v] == nil then
+                    noclipBackup[v] = v.CanCollide
+                end
+                v.CanCollide = false
+            end
         end
+    else
+        for part, original in pairs(noclipBackup) do
+            if part and part.Parent then
+                part.CanCollide = original
+            end
+        end
+        table.clear(noclipBackup)
     end
 end
 
@@ -550,6 +568,12 @@ local function returnToBase(originCFrame, myId, myPriority, isManual)
     local done = false
     local lastTime = os.clock()
 
+    local _, humNow = getChar()
+    local riding = humNow ~= nil and humNow.SeatPart ~= nil
+    local returnSpeed = riding and RETURN_SPEED or RETURN_SPEED_WALK
+    local holdTime = riding and HOME_HOLD or HOME_HOLD_WALK
+    print("[回基地] " .. (riding and "騎乘中" or "步行中") .. "，速度 " .. returnSpeed .. "，停留 " .. holdTime .. " 秒")
+
     setNoclip(true)
 
     local conn
@@ -581,7 +605,7 @@ local function returnToBase(originCFrame, myId, myPriority, isManual)
 
         local offset = originCFrame.Position - targetPart.Position
         local dist = offset.Magnitude
-        local step = RETURN_SPEED * dt
+        local step = returnSpeed * dt
 
         if dist <= step then
             setTargetCFrame(originCFrame)
@@ -610,7 +634,7 @@ local function returnToBase(originCFrame, myId, myPriority, isManual)
     if not isManual and (not enabled or runId ~= myId) then return end
 
     local t0 = os.clock()
-    while (isManual or (enabled and runId == myId)) and (myPriority == nil or taskPriority == myPriority) and (os.clock() - t0 < HOME_HOLD) do
+    while (isManual or (enabled and runId == myId)) and (myPriority == nil or taskPriority == myPriority) and (os.clock() - t0 < holdTime) do
         while isPaused do task.wait(0.05) end
         setTargetCFrame(originCFrame)
         task.wait(0.02)
