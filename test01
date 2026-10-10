@@ -84,6 +84,14 @@ local RETURN_SPEED = 280                   -- 回基地速度
 local HOME_HOLD = 0.5                      -- 到基地後停留鎖定幾秒
 local RETURN_SPEED_WALK = 120              -- 沒騎座騎時的回基地速度（比騎乘慢，先試著調低）
 local HOME_HOLD_WALK = 1.5                 -- 沒騎座騎時，到基地後停留鎖定幾秒
+
+-- ===== 步行運蛋「原點重置」設定 =====
+local WALK_RESET_ENABLED = true            -- 步行拿到蛋後：瞬移到原點 → 放下 → 再撿起 → 再走回基地
+local RESET_POS = Vector3.new(0, 0, 0)     -- 「世界原點」座標（猜測值，若原點在地底/空中請改成實際座標）
+local DROP_BUTTON_TEXT = "放下"            -- 畫面上「放下」按鈕的文字
+local RESET_SETTLE = 0.3                   -- 到原點後等待幾秒再放下
+local RESET_WAIT_DROP = 0.5                -- 放下後等待幾秒再撿
+local RESET_PICKUP_RADIUS = 25             -- 重新撿蛋時，搜尋原點周圍幾格內的蛋
 local LOOP_DELAY = 0.3                     -- 每輪間隔
 -- ======================================
 
@@ -563,6 +571,185 @@ local function findNearestEgg(root)
     return best, bestPos
 end
 
+-- ===== 步行運蛋：原點重置 =====
+local function isGuiVisible(obj)
+    local cur = obj
+    while cur and cur ~= game do
+        if cur:IsA("GuiObject") and not cur.Visible then return false end
+        if cur:IsA("LayerCollector") and cur.Enabled == false then return false end
+        cur = cur.Parent
+    end
+    return true
+end
+
+-- 找畫面上可見的「放下」按鈕（手上有蛋時才會出現）
+local function findDropButton()
+    local pg = player:FindFirstChild("PlayerGui")
+    if not pg then return end
+    for _, v in ipairs(pg:GetDescendants()) do
+        if (v:IsA("TextButton") or v:IsA("TextLabel"))
+            and string.find(v.Text, DROP_BUTTON_TEXT, 1, true)
+            and not v:IsDescendantOf(ScreenGui)
+            and isGuiVisible(v) then
+            local btn = v
+            while btn and not btn:IsA("GuiButton") do
+                btn = btn.Parent
+            end
+            return btn or v
+        end
+    end
+end
+
+-- 方法 1：直接觸發按鈕事件
+local function fireSignals(obj)
+    if not firesignal then return false end
+    local any = false
+    for _, name in ipairs({"MouseButton1Down", "MouseButton1Click", "MouseButton1Up", "Activated"}) do
+        local ok = pcall(function()
+            firesignal(obj[name])
+        end)
+        any = any or ok
+    end
+    return any
+end
+
+-- 方法 2、3：模擬滑鼠點擊按鈕中心
+local function clickGuiObject(obj, useInset)
+    local ok = pcall(function()
+        local vim = game:GetService("VirtualInputManager")
+        local pos = obj.AbsolutePosition + obj.AbsoluteSize / 2
+        local x, y = pos.X, pos.Y
+        if useInset then
+            local inset = game:GetService("GuiService"):GetGuiInset()
+            x, y = x + inset.X, y + inset.Y
+        end
+        vim:SendMouseButtonEvent(x, y, 0, true, game, 0)
+        task.wait(0.05)
+        vim:SendMouseButtonEvent(x, y, 0, false, game, 0)
+    end)
+    return ok
+end
+
+-- 放下蛋：成功的判斷是「放下按鈕消失」
+local function dropEgg()
+    local btn = findDropButton()
+    if not btn then
+        print("[重置蛋] 找不到「" .. DROP_BUTTON_TEXT .. "」按鈕（手上可能沒有蛋）")
+        return false
+    end
+    print("[重置蛋] 找到放下按鈕：" .. btn:GetFullName())
+
+    for method = 1, 3 do
+        local tried
+        if method == 1 then
+            tried = fireSignals(btn)
+        elseif method == 2 then
+            tried = clickGuiObject(btn, true)
+        else
+            tried = clickGuiObject(btn, false)
+        end
+
+        if tried then
+            task.wait(0.4)
+            if not findDropButton() then
+                print("[重置蛋] 放下成功（方法 " .. method .. "）")
+                return true
+            end
+        end
+    end
+
+    print("[重置蛋] 三種方法都沒能放下蛋")
+    return false
+end
+
+-- 收集原點附近、可以撿蛋的互動提示
+local function gatherNearbyPrompts(rootPos, radius)
+    local list = {}
+
+    local function posOf(prompt)
+        local par = prompt.Parent
+        if par and par:IsA("BasePart") then return par.Position end
+        if par and par:IsA("Attachment") then return par.WorldPosition end
+    end
+
+    local folder = Workspace:FindFirstChild("RenderedEggs")
+    if folder then
+        for _, e in ipairs(folder:GetChildren()) do
+            if targets[e.Name] then
+                for _, d in ipairs(e:GetDescendants()) do
+                    if d:IsA("ProximityPrompt") and d.Enabled then
+                        local pp = posOf(d)
+                        if pp and (pp - rootPos).Magnitude <= radius then
+                            table.insert(list, d)
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    -- 備用：掉落的蛋不在 RenderedEggs 時，掃整個 Workspace
+    if #list == 0 then
+        local char = player.Character
+        for _, d in ipairs(Workspace:GetDescendants()) do
+            if d:IsA("ProximityPrompt") and d.Enabled and not (char and d:IsDescendantOf(char)) then
+                local pp = posOf(d)
+                if pp and (pp - rootPos).Magnitude <= radius then
+                    table.insert(list, d)
+                end
+            end
+        end
+    end
+
+    return list
+end
+
+-- 步行運蛋：瞬移到原點 → 放下 → 再撿起
+local function resetEggAtOrigin(myId, myPriority)
+    print("[重置蛋] 步行中，瞬移到原點 " .. tostring(RESET_POS))
+    if not teleportTo(RESET_POS, myId, myPriority, false) then return false end
+    if not smartWait(RESET_SETTLE, myId, myPriority) then return false end
+
+    if not dropEgg() then return false end
+    if not smartWait(RESET_WAIT_DROP, myId, myPriority) then return false end
+
+    local _, _, root = getChar()
+    if not root then return false end
+    local rootPos = root.Position
+
+    -- 等掉落的蛋出現
+    local prompts = {}
+    for _ = 1, 6 do
+        prompts = gatherNearbyPrompts(rootPos, RESET_PICKUP_RADIUS)
+        if #prompts > 0 then break end
+        if not smartWait(0.3, myId, myPriority) then return false end
+    end
+
+    if #prompts == 0 then
+        print("[重置蛋] 在原點附近找不到掉落的蛋")
+        return false
+    end
+    print("[重置蛋] 找到 " .. #prompts .. " 個可撿取的互動提示，開始重新撿起")
+
+    -- 重新撿起：成功的判斷是「放下按鈕」再次出現
+    local deadline = os.clock() + HOLD_TIMEOUT
+    while os.clock() < deadline do
+        for _, pr in ipairs(prompts) do
+            if pr.Parent then
+                interactPrompt(pr)
+            end
+        end
+        if not smartWait(RETRY_INTERVAL, myId, myPriority) then return false end
+        if findDropButton() then
+            print("[重置蛋] 重新撿起成功，準備走回基地")
+            return true
+        end
+    end
+
+    print("[重置蛋] 重新撿起逾時")
+    return false
+end
+
 -- 平滑返回原點/基地
 local function returnToBase(originCFrame, myId, myPriority, isManual)
     local done = false
@@ -777,6 +964,12 @@ local function startLoop()
                 -- 判斷採集結果
                 if not egg.Parent then
                     smartWait(PICKUP_WAIT, myId, myPriority)
+
+                    -- 步行運蛋：先到原點放下再撿起，重置後再走回基地
+                    local _, humW = getChar()
+                    if WALK_RESET_ENABLED and humW and not humW.SeatPart then
+                        resetEggAtOrigin(myId, myPriority)
+                    end
                 else
                     blacklist[egg] = os.clock() + BLACKLIST_TIME
                 end
