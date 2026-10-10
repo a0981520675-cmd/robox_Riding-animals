@@ -1,3 +1,9 @@
+-- ⚙ 只在指定遊戲執行（放進 autoexec 時很重要，避免進到別的遊戲也自動跑）
+-- 填入遊戲頁面網址裡的數字：https://www.roblox.com/games/這串數字/遊戲名稱
+-- 0 = 不限制，任何遊戲都會執行
+local ONLY_PLACE_ID = 0
+if ONLY_PLACE_ID ~= 0 and game.PlaceId ~= ONLY_PLACE_ID then return end
+
 if not game:IsLoaded() then game.Loaded:Wait() end
 
 -- 防重複載入：目前這次遊戲連線中，如果 UI 已經存在就不再執行
