@@ -1,5 +1,15 @@
 if not game:IsLoaded() then game.Loaded:Wait() end
 
+-- 防重複載入：同一個伺服器只允許執行一次
+-- （autoexec 和 queue_on_teleport 同時使用時，避免跑兩份）
+local _genv = getgenv and getgenv()
+if _genv then
+    if _genv.AutoEggLoadedJob and _genv.AutoEggLoadedJob == game.JobId then
+        return
+    end
+    _genv.AutoEggLoadedJob = game.JobId
+end
+
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local CoreGui = game:GetService("CoreGui")
@@ -909,6 +919,15 @@ local VirtualUser = game:GetService("VirtualUser")
 local AUTO_RELOAD_SOURCE = ""
 local REJOIN_RETRY = 5          -- 重連失敗後幾秒再試一次
 
+-- 私人伺服器：回不去時，是否允許改進「公開伺服器」
+-- false = 只嘗試回原本的私人伺服器（建議）
+-- true  = 回不去就改進新的公開伺服器
+local ALLOW_PUBLIC_FALLBACK = false
+
+-- 腳本一開始就先記下伺服器資訊，避免斷線後讀不到
+local CACHED_JOBID = game.JobId
+local CACHED_IS_PRIVATE = (game.PrivateServerId ~= "")
+
 local antiReconnect = true
 local rejoining = false
 local reconnectConns = {}
@@ -945,9 +964,13 @@ local function rejoin(reason)
         while antiReconnect do
             attempt += 1
             pcall(function()
-                if attempt % 2 == 1 and #Players:GetPlayers() > 1 then
+                local sameServerFirst = CACHED_IS_PRIVATE or #Players:GetPlayers() > 1
+                if CACHED_IS_PRIVATE and not ALLOW_PUBLIC_FALLBACK then
+                    -- 私人伺服器：只嘗試回原本的伺服器，不進公開伺服器
+                    TeleportService:TeleportToPlaceInstance(game.PlaceId, CACHED_JOBID, player)
+                elseif attempt % 2 == 1 and sameServerFirst then
                     -- 優先回到同一個伺服器
-                    TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, player)
+                    TeleportService:TeleportToPlaceInstance(game.PlaceId, CACHED_JOBID, player)
                 else
                     -- 同伺服器失敗/只剩自己 → 進新伺服器
                     TeleportService:Teleport(game.PlaceId, player)
@@ -996,6 +1019,7 @@ ReconnectBtn.MouseButton1Click:Connect(function()
 end)
 
 CloseBtn.MouseButton1Click:Connect(function()
+    if _genv then _genv.AutoEggLoadedJob = nil end   -- 關閉後允許重新執行
     antiReconnect = false
     for _, c in ipairs(reconnectConns) do
         if c and c.Connected then c:Disconnect() end
