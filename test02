@@ -8,7 +8,7 @@ local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 
 local targets = {
-    ["Blackhole Egg"] = true,
+    ["Blackhole Egg"] = false,
     ["Solaris Egg"]   = true,
     ["Cherub Egg"]    = true,
     ["Volcanic Egg"]  = true
