@@ -84,6 +84,8 @@ local RETURN_SPEED = 280                   -- 回基地速度
 local HOME_HOLD = 0.5                      -- 到基地後停留鎖定幾秒
 local RETURN_SPEED_WALK = 280              -- 沒騎座騎時的回基地速度（先和騎乘相同；要放慢再自己調低）
 local HOME_HOLD_WALK = 1.5                 -- 沒騎座騎時，到基地後停留鎖定幾秒
+local RETURN_FLY_HEIGHT_WALK = 80          -- 步行回基地的飛行高度（比路徑最高點再高幾格；0 = 不拉高）
+local RETURN_FLY_HEIGHT_RIDE = 0           -- 騎乘回基地的飛行高度（0 = 維持原本直線飛回）
 
 -- ===== 步行運蛋「原點重置」設定 =====
 local WALK_RESET_ENABLED = true            -- 步行拿到蛋後：瞬移到原點 → 放下 → 再撿起 → 再走回基地
@@ -753,7 +755,15 @@ local function returnToBase(originCFrame, myId, myPriority, isManual)
     local riding = humNow ~= nil and humNow.SeatPart ~= nil
     local returnSpeed = riding and RETURN_SPEED or RETURN_SPEED_WALK
     local holdTime = riding and HOME_HOLD or HOME_HOLD_WALK
-    print("[回基地] " .. (riding and "騎乘中" or "步行中") .. "，速度 " .. returnSpeed .. "，停留 " .. holdTime .. " 秒")
+    local flyHeight = riding and RETURN_FLY_HEIGHT_RIDE or RETURN_FLY_HEIGHT_WALK
+    print("[回基地] " .. (riding and "騎乘中" or "步行中") .. "，速度 " .. returnSpeed .. "，停留 " .. holdTime .. " 秒，飛行高度 +" .. flyHeight)
+
+    -- 路線：垂直升高 → 在高空水平飛到基地正上方 → 垂直降落到基地
+    -- phase 1 = 升高，2 = 高空水平移動，3 = 降落
+    local startPart = getMoveTarget()
+    local startPos = startPart and startPart.Position or originCFrame.Position
+    local cruiseY = math.max(startPos.Y, originCFrame.Position.Y) + flyHeight
+    local phase = (flyHeight > 0) and 1 or 3
 
     setNoclip(true)
 
@@ -793,15 +803,30 @@ local function returnToBase(originCFrame, myId, myPriority, isManual)
         local dt = now - lastTime
         lastTime = now
 
-        local offset = originCFrame.Position - targetPart.Position
+        local pos = targetPart.Position
+        local goal
+        if phase == 1 then
+            goal = Vector3.new(pos.X, cruiseY, pos.Z)
+        elseif phase == 2 then
+            goal = Vector3.new(originCFrame.Position.X, cruiseY, originCFrame.Position.Z)
+        else
+            goal = originCFrame.Position
+        end
+
+        local offset = goal - pos
         local dist = offset.Magnitude
         local step = returnSpeed * dt
 
         if dist <= step then
-            setTargetCFrame(originCFrame)
-            done = true
+            if phase == 3 then
+                setTargetCFrame(originCFrame)
+                done = true
+            else
+                setTargetCFrame(CFrame.new(goal))
+                phase += 1
+            end
         else
-            setTargetCFrame(CFrame.new(targetPart.Position + offset.Unit * step))
+            setTargetCFrame(CFrame.new(pos + offset.Unit * step))
         end
     end)
 
