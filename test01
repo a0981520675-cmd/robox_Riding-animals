@@ -931,9 +931,14 @@ local REJOIN_RETRY = 5          -- 重連失敗後幾秒再試一次
 -- true  = 回不去就改進新的公開伺服器
 local ALLOW_PUBLIC_FALLBACK = false
 
--- 腳本一開始就先記下伺服器資訊，避免斷線後讀不到
+-- 是否在私人伺服器掛機（客戶端讀不到 PrivateServerId，所以改成手動設定）
+-- true  = 私人伺服器：斷線只嘗試回原伺服器（除非 ALLOW_PUBLIC_FALLBACK = true）
+-- false = 公開伺服器
+local PRIVATE_SERVER_MODE = true
+
+-- 腳本一開始就先記下伺服器編號，避免斷線後讀不到
 local CACHED_JOBID = game.JobId
-local CACHED_IS_PRIVATE = (game.PrivateServerId ~= "")
+local CACHED_IS_PRIVATE = PRIVATE_SERVER_MODE
 
 local antiReconnect = true
 local rejoining = false
