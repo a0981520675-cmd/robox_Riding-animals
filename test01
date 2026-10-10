@@ -1,13 +1,14 @@
 if not game:IsLoaded() then game.Loaded:Wait() end
 
--- 防重複載入：同一個伺服器只允許執行一次
--- （autoexec 和 queue_on_teleport 同時使用時，避免跑兩份）
-local _genv = getgenv and getgenv()
-if _genv then
-    if _genv.AutoEggLoadedJob and _genv.AutoEggLoadedJob == game.JobId then
+-- 防重複載入：目前這次遊戲連線中，如果 UI 已經存在就不再執行
+-- （重連後是全新的連線，UI 不存在，所以會正常載入）
+do
+    local lp = game:GetService("Players").LocalPlayer
+    local pg = lp and lp:FindFirstChild("PlayerGui")
+    local cg = game:GetService("CoreGui")
+    if (pg and pg:FindFirstChild("AutoEggPathGui")) or cg:FindFirstChild("AutoEggPathGui") then
         return
     end
-    _genv.AutoEggLoadedJob = game.JobId
 end
 
 local Players = game:GetService("Players")
@@ -1019,7 +1020,6 @@ ReconnectBtn.MouseButton1Click:Connect(function()
 end)
 
 CloseBtn.MouseButton1Click:Connect(function()
-    if _genv then _genv.AutoEggLoadedJob = nil end   -- 關閉後允許重新執行
     antiReconnect = false
     for _, c in ipairs(reconnectConns) do
         if c and c.Connected then c:Disconnect() end
