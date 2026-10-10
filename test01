@@ -86,6 +86,9 @@ local RETURN_SPEED_WALK = 280              -- 沒騎座騎時的回基地速度�
 local HOME_HOLD_WALK = 1.5                 -- 沒騎座騎時，到基地後停留鎖定幾秒
 local RETURN_FLY_HEIGHT_WALK = 80          -- 步行回基地的飛行高度（比路徑最高點再高幾格；0 = 不拉高）
 local RETURN_FLY_HEIGHT_RIDE = 0           -- 騎乘回基地的飛行高度（0 = 維持原本直線飛回）
+local RETURN_TELEPORT_WALK = true          -- 步行回基地：直接傳送（true）或飛回（false，用上面的飛行高度）
+local RETURN_TELEPORT_RIDE = false         -- 騎乘回基地：直接傳送（true）或飛回（false）
+local RETURN_TP_STEP = 75                  -- 傳送回基地時每段距離；調很大（例如 1e9）就是一次跳到位
 
 -- ===== 步行運蛋「原點重置」設定 =====
 local WALK_RESET_ENABLED = true            -- 步行拿到蛋後：瞬移到原點 → 放下 → 再撿起 → 再走回基地
@@ -472,7 +475,8 @@ local function driftTo(targetCFrame, duration, myId, myPriority)
 end
 
 -- 普通分段傳送
-local function teleportTo(pos, myId, myPriority, ignoreState)
+local function teleportTo(pos, myId, myPriority, ignoreState, stepDist)
+    local stepLen = stepDist or STEP_DIST
     local targetPos = pos + TP_OFFSET
     local targetPart = getMoveTarget()
     if not targetPart then return false end
@@ -491,12 +495,12 @@ local function teleportTo(pos, myId, myPriority, ignoreState)
         end
 
         local dist = (targetPart.Position - targetPos).Magnitude
-        if dist <= STEP_DIST then
+        if dist <= stepLen then
             break
         end
 
         local dir = (targetPos - targetPart.Position).Unit
-        local nextPos = targetPart.Position + dir * STEP_DIST
+        local nextPos = targetPart.Position + dir * stepLen
         setTargetCFrame(CFrame.new(nextPos))
         
         if not ignoreState then
@@ -764,6 +768,26 @@ local function returnToBase(originCFrame, myId, myPriority, isManual)
     local startPos = startPart and startPart.Position or originCFrame.Position
     local cruiseY = math.max(startPos.Y, originCFrame.Position.Y) + flyHeight
     local phase = (flyHeight > 0) and 1 or 3
+
+    -- 傳送模式：不飛行，直接傳送到基地（不會經過中途的偵測範圍）
+    local useTeleport = riding and RETURN_TELEPORT_RIDE or ((not riding) and RETURN_TELEPORT_WALK)
+    if useTeleport then
+        print("[回基地] 使用直接傳送")
+        local okTp = teleportTo(originCFrame.Position - TP_OFFSET, myId, myPriority, isManual, RETURN_TP_STEP)
+        if not okTp then return end
+        setTargetCFrame(originCFrame)
+
+        if myPriority and taskPriority ~= myPriority then return end
+        if not isManual and (not enabled or runId ~= myId) then return end
+
+        local tHold = os.clock()
+        while (isManual or (enabled and runId == myId)) and (myPriority == nil or taskPriority == myPriority) and (os.clock() - tHold < holdTime) do
+            while isPaused do task.wait(0.05) end
+            setTargetCFrame(originCFrame)
+            task.wait(0.02)
+        end
+        return
+    end
 
     setNoclip(true)
 
