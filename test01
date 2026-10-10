@@ -87,7 +87,7 @@ local HOME_HOLD_WALK = 1.5                 -- 沒騎座騎時，到基地後停�
 
 -- ===== 步行運蛋「原點重置」設定 =====
 local WALK_RESET_ENABLED = true            -- 步行拿到蛋後：瞬移到原點 → 放下 → 再撿起 → 再走回基地
-local RESET_POS = Vector3.new(0, 0, 0)     -- 「世界原點」座標（猜測值，若原點在地底/空中請改成實際座標）
+local RESET_POS = nil                      -- 重置點：站在可以放蛋的地面，按 UI 的「📌 記錄重置點」設定（沒設定就不會重置）
 local DROP_BUTTON_TEXT = "放下"            -- 畫面上「放下」按鈕的文字
 local RESET_SETTLE = 0.3                   -- 到原點後等待幾秒再放下
 local RESET_WAIT_DROP = 0.5                -- 放下後等待幾秒再撿
@@ -109,7 +109,7 @@ print("[腳本] UI 已建立，位置：" .. parentGui.Name)
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 220, 0, 324)
+MainFrame.Size = UDim2.new(0, 220, 0, 366)
 MainFrame.Position = UDim2.new(0.05, 0, 0.35, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 32, 38)
 MainFrame.BorderSizePixel = 0
@@ -302,6 +302,21 @@ ReconnectBtn.Parent = MainFrame
 local ReconnectCorner = Instance.new("UICorner")
 ReconnectCorner.CornerRadius = UDim.new(0, 6)
 ReconnectCorner.Parent = ReconnectBtn
+
+local RecordBtn = Instance.new("TextButton")
+RecordBtn.Name = "RecordBtn"
+RecordBtn.Size = UDim2.new(1, -20, 0, 34)
+RecordBtn.Position = UDim2.new(0, 10, 0, 322)
+RecordBtn.BackgroundColor3 = Color3.fromRGB(110, 90, 190)
+RecordBtn.Text = "📌 記錄重置點"
+RecordBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+RecordBtn.TextSize = 13
+RecordBtn.Font = Enum.Font.GothamBold
+RecordBtn.Parent = MainFrame
+
+local RecordCorner = Instance.new("UICorner")
+RecordCorner.CornerRadius = UDim.new(0, 6)
+RecordCorner.Parent = RecordBtn
 
 -- ===== 拖動 UI 邏輯 =====
 local dragging = false
@@ -690,7 +705,19 @@ end
 
 -- 步行運蛋：瞬移到原點 → 放下 → 再撿起
 local function resetEggAtOrigin(myId, myPriority)
-    print("[重置蛋] 步行中，瞬移到原點 " .. tostring(RESET_POS))
+    if not RESET_POS then
+        print("[重置蛋] 尚未記錄重置點，略過（請站在要放蛋的地面，按「📌 記錄重置點」）")
+        return false
+    end
+
+    -- 安全檢查：重置點下方沒有地面就不傳送，避免掉進虛空
+    local ground = Workspace:Raycast(RESET_POS + Vector3.new(0, 10, 0), Vector3.new(0, -100, 0))
+    if not ground then
+        print("[重置蛋] 重置點下方找不到地面，略過（請重新記錄重置點）")
+        return false
+    end
+
+    print("[重置蛋] 步行中，瞬移到重置點 " .. tostring(RESET_POS))
     if not teleportTo(RESET_POS, myId, myPriority, false) then return false end
     if not smartWait(RESET_SETTLE, myId, myPriority) then return false end
 
@@ -1247,6 +1274,15 @@ table.insert(reconnectConns, player.Idled:Connect(function()
         VirtualUser:ClickButton2(Vector2.new())
     end)
 end))
+
+RecordBtn.MouseButton1Click:Connect(function()
+    local _, _, root = getChar()
+    if not root then return end
+    -- teleportTo 會自動加上 TP_OFFSET，這裡先扣掉，讓落點剛好是你現在站的位置
+    RESET_POS = root.Position - TP_OFFSET
+    RecordBtn.Text = string.format("📌 已記錄 %d, %d, %d", root.Position.X, root.Position.Y, root.Position.Z)
+    RecordBtn.BackgroundColor3 = Color3.fromRGB(70, 140, 90)
+end)
 
 ReconnectBtn.MouseButton1Click:Connect(function()
     antiReconnect = not antiReconnect
