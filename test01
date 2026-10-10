@@ -2,9 +2,17 @@
 -- 填入遊戲頁面網址裡的數字：https://www.roblox.com/games/這串數字/遊戲名稱
 -- 0 = 不限制，任何遊戲都會執行
 local ONLY_PLACE_ID = 0
-if ONLY_PLACE_ID ~= 0 and game.PlaceId ~= ONLY_PLACE_ID then return end
+if ONLY_PLACE_ID ~= 0 and game.PlaceId ~= ONLY_PLACE_ID then
+    print("[腳本] PlaceId 不符，未執行（目前遊戲 PlaceId = " .. tostring(game.PlaceId) .. "）")
+    return
+end
 
 if not game:IsLoaded() then game.Loaded:Wait() end
+
+-- autoexec 可能在玩家還沒準備好時就執行，先等玩家與 PlayerGui 都出現
+repeat task.wait() until game:GetService("Players").LocalPlayer
+game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui", 15)
+print("[腳本] 開始載入")
 
 -- 防重複載入：目前這次遊戲連線中，如果 UI 已經存在就不再執行
 -- （重連後是全新的連線，UI 不存在，所以會正常載入）
@@ -13,6 +21,7 @@ do
     local pg = lp and lp:FindFirstChild("PlayerGui")
     local cg = game:GetService("CoreGui")
     if (pg and pg:FindFirstChild("AutoEggPathGui")) or cg:FindFirstChild("AutoEggPathGui") then
+        print("[腳本] UI 已存在，略過重複載入")
         return
     end
 end
@@ -86,6 +95,7 @@ local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "AutoEggPathGui"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = parentGui
+print("[腳本] UI 已建立，位置：" .. parentGui.Name)
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
