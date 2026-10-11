@@ -64,10 +64,13 @@ local CANDY_TYPES = {                      -- 要撿哪些糖果（依互動提�
     ["Common Candy"] = true,
     ["Rare Candy"]   = true,
     ["Epic Candy"]   = true,
+    ["Legendary Candy"] = true,
 }
 local CANDY_DELIVER_EVERY = 1              -- 每撿幾顆糖果就回交付位置一次
-local CANDY_WAIT_ENABLE = 2.0              -- 到糖果旁最多等幾秒讓互動提示啟用
-local CANDY_BLACKLIST_TIME = 10            -- 目前沒有糖果的生成點，暫時跳過幾秒
+local CANDY_WAIT_ENABLE = 4.0              -- 到糖果旁最多等幾秒讓互動提示啟用（糖果出現後約 2 秒才可撿）
+local CANDY_BLACKLIST_TIME = 10            -- 提示一直沒啟用的生成點，暫時跳過幾秒
+local CANDY_REQUIRE_AVAILABLE = true       -- 只去「確定有糖果」的生成點（讀取提示上的 CandyPromptAvailable 屬性）
+local candyIdleLog = 0                     -- 上次印出「沒有糖果」訊息的時間
 local candyMode = false                    -- 糖果模式開關（用 UI 按鈕切換）
 local candyPickedCount = 0                 -- 自上次交付後撿了幾顆
 -- ======================================
@@ -554,6 +557,23 @@ local function getCandyCount()
     return v and v.Value
 end
 
+-- 這個生成點「現在有糖果」嗎？
+-- 依據紀錄：糖果出現時 CandyAmount 的 ForceDisabled 會變 false（離多遠都看得到），
+-- 而 Pickup 的 CandyPromptAvailable 要再等約 2 秒、而且似乎要靠近才會變 true。
+-- 所以兩個條件只要有一個成立，就當作有糖果。
+local function candyIsPresent(prompt)
+    if prompt:GetAttribute("CandyPromptAvailable") == true then return true end
+    local amount = prompt.Parent and prompt.Parent:FindFirstChild("CandyAmount")
+    return amount ~= nil and amount:GetAttribute("ForceDisabled") == false
+end
+
+-- 糖果被撿走了嗎？（屬性明確變成「沒有」）
+local function candyIsGone(prompt)
+    if prompt:GetAttribute("CandyPromptAvailable") == false then return true end
+    local amount = prompt.Parent and prompt.Parent:FindFirstChild("CandyAmount")
+    return amount ~= nil and amount:GetAttribute("ForceDisabled") == true
+end
+
 -- 找最近、而且種類符合 CANDY_TYPES 的糖果生成點
 local function findNearestCandy(root)
     local area = Workspace:FindFirstChild("HalloweenArea")
@@ -565,6 +585,7 @@ local function findNearestCandy(root)
 
     for _, d in ipairs(spawns:GetDescendants()) do
         if d:IsA("ProximityPrompt") and CANDY_TYPES[d.ObjectText]
+            and (not CANDY_REQUIRE_AVAILABLE or candyIsPresent(d))
             and not (blacklist[d] and blacklist[d] > now) then
             local par = d.Parent
             if par and par:IsA("BasePart") then
@@ -579,6 +600,48 @@ local function findNearestCandy(root)
     if best then
         return best, bestPos, best.ObjectText
     end
+end
+
+-- 找不到糖果時，說明目前的狀況（區域在不在、有幾個提示、屬性是不是 true）
+local function candyDiagnose()
+    local area = Workspace:FindFirstChild("HalloweenArea")
+    if not area then
+        return "找不到 Workspace.HalloweenArea（可能不在活動區域，或活動的結構被改了）"
+    end
+    local spawns = area:FindFirstChild("CandySpawns")
+    if not spawns then
+        return "找不到 HalloweenArea.CandySpawns（結構可能被改了）"
+    end
+
+    local total, typeOk, avail, present = 0, 0, 0, 0
+    local others, otherNames = {}, {}
+    for _, d in ipairs(spawns:GetDescendants()) do
+        if d:IsA("ProximityPrompt") then
+            total = total + 1
+            if CANDY_TYPES[d.ObjectText] then
+                typeOk = typeOk + 1
+            else
+                local t = tostring(d.ObjectText)
+                if not others[t] then
+                    others[t] = true
+                    table.insert(otherNames, t)
+                end
+            end
+            if d:GetAttribute("CandyPromptAvailable") == true then
+                avail = avail + 1
+            end
+            if candyIsPresent(d) then
+                present = present + 1
+            end
+        end
+    end
+
+    local otherText = "無"
+    if #otherNames > 0 then
+        otherText = table.concat(otherNames, "、")
+    end
+    return string.format("生成點提示共 %d 個｜種類符合 %d 個｜CandyPromptAvailable=true 共 %d 個｜判定有糖果 共 %d 個｜不在 CANDY_TYPES 的物品文字：%s",
+        total, typeOk, avail, present, otherText)
 end
 
 -- 平滑返回原點/基地
@@ -682,6 +745,10 @@ local function startLoop()
             if candyMode then
                 local prompt, candyPos, candyType = findNearestCandy(root)
                 if not prompt then
+                    if os.clock() - candyIdleLog > 10 then
+                        candyIdleLog = os.clock()
+                        print("[糖果] 目前附近沒有可撿的糖果，等待中... | " .. candyDiagnose())
+                    end
                     if not smartWait(1, myId, myPriority) then break end
                     continue
                 end
@@ -712,6 +779,11 @@ local function startLoop()
                     while isPaused do task.wait(0.05) end
 
                     if not prompt.Parent then
+                        picked = true
+                        break
+                    end
+
+                    if sawEnabled and candyIsGone(prompt) then
                         picked = true
                         break
                     end
